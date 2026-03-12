@@ -53,7 +53,13 @@ module.exports = {
              }
          } */
 
-        // 4. Restart bot (Asumsikan di-run pakai PM2 atau process manager / nodemon)
-        //  process.exit(0)
+        // 4. Restart bot
+        setTimeout(() => {
+            if (process.send) {
+                process.send('restart')
+            } else {
+                process.exit(0)
+            }
+        }, 1000)
     }
 }
