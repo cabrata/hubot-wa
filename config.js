@@ -2,8 +2,9 @@ const fs = require('fs')
 const chalk = require('chalk')
 
 // ============== BOT SETTINGS ==============
-global.botName = 'BotWA'
+global.botName = 'HuTao Bot'
 global.botVersion = '1.0.0'
+global.author = '@caliphdev'
 
 // Owner numbers (without @s.whatsapp.net)
 global.owner = ['6281533331660', '6281268880344', '6282153017890']   // ganti dengan nomor owner

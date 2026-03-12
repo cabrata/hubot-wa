@@ -2,7 +2,6 @@
     // =============================================
     //  LOAD CONFIG & SERVER
     // =============================================
-    require('./config')
     require('./servers') // Start HTTP server immediately
 
     // wbssocket is ESM — use dynamic import()
