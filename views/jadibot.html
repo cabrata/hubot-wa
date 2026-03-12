@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JadiBot — Clone Bot</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',sans-serif;background:#0a0a0f;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .container{max-width:420px;width:100%;padding:24px}
+  .card{background:linear-gradient(145deg,#13131a,#1a1a24);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:32px 24px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+  .logo{font-size:24px;font-weight:700;margin-bottom:4px}.logo span{color:#a78bfa}
+  .subtitle{color:#666;font-size:13px;margin-bottom:20px}
+  .status{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;margin-bottom:20px}
+  .status.waiting{background:rgba(250,204,21,0.1);color:#facc15}
+  .status.connected{background:rgba(74,222,128,0.1);color:#4ade80}
+  .status.error{background:rgba(248,113,113,0.1);color:#f87171}
+  .dot{width:8px;height:8px;border-radius:50%;animation:pulse 1.5s infinite}
+  .waiting .dot{background:#facc15}.connected .dot{background:#4ade80;animation:none}.error .dot{background:#f87171}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .tabs{display:flex;gap:4px;margin-bottom:20px;background:rgba(255,255,255,0.04);border-radius:10px;padding:4px}
+  .tab{flex:1;padding:8px;border-radius:8px;border:none;background:transparent;color:#888;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s}
+  .tab.active{background:rgba(167,139,250,0.15);color:#a78bfa}
+  .input-group{position:relative;margin-bottom:12px}
+  .input-group input{width:100%;padding:12px 16px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#fff;font-size:14px;outline:none;transition:border-color 0.2s}
+  .input-group input:focus{border-color:#a78bfa}
+  .input-group input::placeholder{color:#555}
+  .btn{width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#a78bfa,#7c3aed);color:#fff;font-weight:600;font-size:14px;cursor:pointer;transition:all 0.2s}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(167,139,250,0.3)}.btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+  .code-display{font-size:32px;font-weight:700;letter-spacing:6px;color:#a78bfa;margin:16px 0;font-family:monospace}
+  .code-name{color:#888;font-size:12px}
+  #qr-area img{display:block;margin:0 auto 16px;border-radius:12px;background:#fff;padding:12px;max-width:280px;width:100%}
+  .qr-info{color:#888;font-size:13px;margin-bottom:8px}
+  .connected-info{padding:20px 0}.connected-info .name{font-size:18px;font-weight:600;color:#a78bfa}
+  .connected-info .id{font-size:12px;color:#666;margin-top:4px}.connected-icon{font-size:48px;margin-bottom:12px}
+  .hidden{display:none!important}.error-msg{color:#f87171;font-size:13px;margin-top:8px}
+  .rules{text-align:left;background:rgba(255,255,255,0.03);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:12px;color:#888;line-height:1.6}
+  .rules b{color:#f87171}
+</style>
+</head>
+<body>
+<div class="container"><div class="card">
+  <div class="logo">Jadi<span>Bot</span></div>
+  <div class="subtitle">Clone Bot — Jadikan nomormu sebagai bot</div>
+  <div class="status waiting" id="status"><div class="dot"></div><span>Pilih metode koneksi</span></div>
+
+  <div id="setup-area">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('pair')">Pairing Code</button>
+      <button class="tab" onclick="switchTab('qr')">Scan QR</button>
+    </div>
+    <div id="pair-tab">
+      <div class="input-group"><input type="tel" id="phone" placeholder="Nomor WA (contoh: 628xxx)" /></div>
+      <button class="btn" id="pair-btn" onclick="startPairing()">🔗 Generate Pairing Code</button>
+      <div id="pair-result"></div>
+      <div id="pair-error" class="error-msg"></div>
+    </div>
+    <div id="qr-tab" class="hidden">
+      <button class="btn" onclick="startQR()">📷 Mulai Scan QR</button>
+      <div id="qr-area" style="margin-top:16px"></div>
+    </div>
+  </div>
+
+  <div id="connected-area" class="hidden">
+    <div class="connected-info">
+      <div class="connected-icon">✅</div>
+      <div class="name" id="bot-name"></div>
+      <div class="jid" id="bot-jid"></div>
+      <p style="color:#888;font-size:13px;margin-top:12px">Ketik <code>.stopbot</code> pada nomor bot untuk mematikan</p>
+    </div>
+  </div>
+
+  <div class="rules">
+    <b>⚠ Rules:</b><br>
+    1. Jangan komplain ke owner kalo nomor di-banned<br>
+    2. Bot ini gratis, jangan disewakan<br>
+    3. Jangan spam / chat private orang
+  </div>
+</div></div>
+<script>
+const TOKEN = '%%TOKEN%%';
+const ws = new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
+const statusEl = document.getElementById('status');
+const setupArea = document.getElementById('setup-area');
+const connArea = document.getElementById('connected-area');
+
+function setStatus(type, text) {
+  statusEl.className='status '+type;
+  statusEl.innerHTML='<div class="dot"></div><span>'+text+'</span>';
+}
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',tab==='pair'?i===0:i===1));
+  document.getElementById('pair-tab').classList.toggle('hidden',tab!=='pair');
+  document.getElementById('qr-tab').classList.toggle('hidden',tab!=='qr');
+}
+function startPairing() {
+  const phone=document.getElementById('phone').value.trim();
+  if(!phone){document.getElementById('pair-error').textContent='Masukkan nomor!';return}
+  document.getElementById('pair-btn').disabled=true;
+  document.getElementById('pair-error').textContent='';
+  document.getElementById('pair-result').innerHTML='<div style="color:#888;padding:12px">Menghubungkan...</div>';
+  setStatus('waiting','Menghubungkan...');
+  ws.send(JSON.stringify({type:'jadibot_start',token:TOKEN,phone,mode:'pair'}));
+}
+function startQR() {
+  document.getElementById('qr-area').innerHTML='<div style="color:#888;padding:20px">Menunggu QR Code...</div>';
+  setStatus('waiting','Menunggu QR Code...');
+  ws.send(JSON.stringify({type:'jadibot_start',token:TOKEN,mode:'qr'}));
+}
+ws.onmessage=(e)=>{
+  const data=JSON.parse(e.data);
+  if(data.type==='jadibot_pairing'){
+    document.getElementById('pair-btn').disabled=false;
+    document.getElementById('pair-result').innerHTML='<div class="code-display">'+data.code+'</div><div class="code-name">Buka notifikasi WA, ketuk, tempel kode ini</div>';
+    setStatus('waiting','Masukkan kode di WhatsApp');
+  }
+  if(data.type==='jadibot_qr'){
+    document.getElementById('qr-area').innerHTML='<img src="'+data.qr+'" alt="QR"/><div class="qr-info">Scan '+data.attempt+'/'+data.max+' — QR refresh otomatis</div>';
+    setStatus('waiting','Scan QR Code');
+  }
+  if(data.type==='jadibot_connected'){
+    setStatus('connected','Terhubung!');
+    setupArea.classList.add('hidden');
+    connArea.classList.remove('hidden');
+    document.getElementById('bot-name').textContent=data.user?.name||'Bot';
+    document.getElementById('bot-jid').textContent=data.user?.id||'';
+  }
+  if(data.type==='jadibot_status'){
+    if(data.status==='connecting')setStatus('waiting','Menghubungkan...');
+    if(data.status==='reconnecting')setStatus('waiting','Reconnecting...');
+  }
+  if(data.type==='jadibot_disconnected'){
+    setStatus('error','Terputus ('+data.reason+')');
+    setupArea.classList.remove('hidden');connArea.classList.add('hidden');
+  }
+  if(data.type==='error'){
+    setStatus('error',data.message);
+    document.getElementById('pair-btn').disabled=false;
+    document.getElementById('pair-error').textContent=data.message;
+    document.getElementById('pair-result').innerHTML='';
+  }
+};
+ws.onopen=()=>{ws.send(JSON.stringify({type:'jadibot_check',token:TOKEN}))};
+ws.onclose=()=>setStatus('error','WebSocket terputus');
+</script>
+</body></html>

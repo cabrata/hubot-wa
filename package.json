@@ -1,0 +1,53 @@
+{
+    "name": "botwa",
+    "version": "1.0.0",
+    "description": "WhatsApp Bot with Categorized Plugin System",
+    "main": "main.js",
+    "scripts": {
+        "start": "TMPDIR=./tmp node main.js",
+        "dev": "node main.js --code",
+        "db:generate": "npx prisma generate",
+        "db:push": "npx prisma db push",
+        "db:studio": "npx prisma studio"
+    },
+    "dependencies": {
+        "@aws-sdk/client-s3": "^3.1006.0",
+        "@aws-sdk/s3-request-presigner": "^3.1007.0",
+        "@dunkelhaiser/caesar-cipher": "^2.0.5",
+        "@google/genai": "^1.44.0",
+        "@prisma/client": "5.20.0",
+        "@shineiichijo/marika": "^3.0.1",
+        "acrcloud": "^1.4.0",
+        "audio-decode": "^2.2.3",
+        "awesome-phonenumber": "^7.8.0",
+        "axios": "^1.13.6",
+        "canvas": "^3.2.1",
+        "chalk": "^4.1.2",
+        "dotenv": "^17.3.1",
+        "express": "^4.18.2",
+        "genius-lyrics": "^4.4.7",
+        "google-tts-api": "^2.0.2",
+        "human-readable": "^0.2.1",
+        "jimp": "^1.6.0",
+        "mal-scraper": "^2.13.2",
+        "moment-timezone": "^0.6.0",
+        "node-cache": "^5.1.2",
+        "node-fetch": "^2.7.0",
+        "node-schedule": "^2.1.1",
+        "pino": "^8.17.2",
+        "puppeteer-core": "^24.38.0",
+        "qrcode": "^1.5.4",
+        "qs": "^6.15.0",
+        "replicate": "^1.4.0",
+        "spotify-web-api-node": "^5.0.2",
+        "syntax-error": "^1.4.0",
+        "wa-sticker-formatter": "^4.4.4",
+        "wbssocket": "^4.1.0",
+        "ws": "^8.16.0",
+        "yargs": "^17.7.2",
+        "yt-search": "^2.13.1"
+    },
+    "devDependencies": {
+        "prisma": "5.20.0"
+    }
+}

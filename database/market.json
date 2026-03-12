@@ -1,0 +1,67 @@
+{
+  "lastUpdate": 1773327636582,
+  "assetsConfig": {
+    "iron": {
+      "name": "Biji Besi",
+      "basePrice": 18000,
+      "volatility": 0.05,
+      "vLiq": 1200000
+    },
+    "gold": {
+      "name": "Emas Antam",
+      "basePrice": 1350000,
+      "volatility": 0.05,
+      "vLiq": 2500000
+    },
+    "diamond": {
+      "name": "Diamond",
+      "basePrice": 395000000,
+      "volatility": 0.05,
+      "vLiq": 100
+    },
+    "htc": {
+      "name": "HutaoCoin",
+      "basePrice": 30000000000,
+      "volatility": 0.05,
+      "vLiq": 100000
+    },
+    "btc": {
+      "name": "Bitcoin",
+      "basePrice": 50000000,
+      "volatility": 0.05,
+      "vLiq": 1000
+    },
+    "nbc": {
+      "name": "NabilCoin",
+      "basePrice": 5000000000,
+      "volatility": 0.05,
+      "vLiq": 1000
+    }
+  },
+  "assets": {
+    "iron": {
+      "currentPrice": 13681,
+      "previousPrice": 14173
+    },
+    "gold": {
+      "currentPrice": 157935,
+      "previousPrice": 158366
+    },
+    "diamond": {
+      "currentPrice": 40169130,
+      "previousPrice": 39910717
+    },
+    "htc": {
+      "currentPrice": 4356199027,
+      "previousPrice": 4328335582
+    },
+    "btc": {
+      "currentPrice": 5099514,
+      "previousPrice": 5151640
+    },
+    "nbc": {
+      "currentPrice": 1125000000,
+      "previousPrice": 500000000
+    }
+  }
+}

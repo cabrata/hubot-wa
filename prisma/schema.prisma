@@ -1,0 +1,664 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================
+//  USER (Core identity & profile)
+// =============================================
+model User {
+  jid           String   @id
+  name          String   @default("")
+  pushName      String   @default("")
+  gender        String   @default("lk")
+  registered    Boolean  @default(false)
+  age          BigInt     @default(-1)
+  regTime       BigInt   @default(-1)
+  regSince      BigInt   @default(0)
+  setName       BigInt   @default(0)
+  setAge        BigInt   @default(0)
+  sn            String   @default("")
+
+  // ── Ban & Moderation ──
+  banned        Boolean  @default(false)
+  bannedTime    BigInt   @default(0)
+  Banneduser    Boolean  @default(false)
+  bannedReason  String   @default("")
+  banLevel     BigInt     @default(0)
+  lastBanTime   BigInt   @default(0)
+  warn         BigInt     @default(0)
+  moderator     Boolean  @default(false)
+  timSupport    Boolean  @default(false)
+  bannedUntil  BigInt  @default(0)
+
+  // ── AFK ──
+  afk           BigInt   @default(-1)
+  afkReason     String   @default("") @db.Text
+
+  // ── Premium & Custom Watermark ──
+  premium       BigInt   @default(0)
+  premiumTime   BigInt   @default(0)
+  exifPack      String   @default("")
+  exifAuthor    String   @default("")
+
+  // ── Level & Limit ──
+  exp           BigInt   @default(0)
+  level        BigInt     @default(0)
+  coin          BigInt   @default(0)
+  atm           BigInt   @default(0)
+  limit        BigInt     @default(500)
+  glimit       BigInt     @default(10)
+  tprem        BigInt     @default(0)
+  tigame       BigInt     @default(5)
+
+  // ── Profile / Role ──
+  lbars         String   @default("[▒▒▒▒▒▒▒▒▒]")
+  role          String   @default("Newbie ㋡")
+  autolevelup   Boolean  @default(false)
+  job           String   @default("Pengangguran")
+  jobexp       BigInt     @default(0)
+  vip           String   @default("tidak")
+  vipPoin      BigInt     @default(0)
+  ajd          BigInt     @default(0)
+  skata        BigInt     @default(0)
+
+  // ── Status flags ──
+  jail          Boolean  @default(false)
+  penjara       Boolean  @default(false)
+  dirawat       Boolean  @default(false)
+  kingdom       Boolean  @default(false)
+
+  // ── Marriage / Social ──
+  statusNikah   Boolean  @default(false)
+  tanggalNikah  BigInt   @default(0)
+  hamil         Boolean  @default(false)
+  hamilStart    BigInt   @default(0)
+  lastKencan    BigInt   @default(0)
+  lastCekAyang  BigInt   @default(0)
+  lastRawatAnak BigInt   @default(0)
+
+  // ── Slot Machine ──
+  slotNetWinLoss  Float   @default(0)
+  spinLock        Boolean @default(false) @map("_spinLock")
+  slotFreeSpins  BigInt    @default(0)
+  slotFSBet       Float   @default(0)
+  freespin       BigInt    @default(0)
+  fsBet           Float   @default(0)
+  slotSpinning    Boolean @default(false)
+  isAutoSpinning  Boolean @default(false)
+  cancelAutoSpin  Boolean @default(false)
+  lastslot        BigInt  @default(0)
+
+  // ── JSON / Complex fields ──
+  ds             Json    @default("{\"limit\":20,\"last\":0}")
+  chatgpt        Json    @default("{\"lastReset\":0,\"usage\":{}}")
+  guildId        String?
+  gift           Json    @default("{}")
+  portofolio     Json    @default("{}")
+  invest         Json    @default("{}")
+  anak           Json    @default("[]")
+  properti       Json?
+  pasanganChar   Json?
+  lastCharSearch Json?
+
+  // ── Misc ──
+  perkerjaandua  BigInt  @default(0)
+
+  // ── Relations ──
+  economy    UserEconomy?
+  rpg        UserRpg?
+  cooldown   UserCooldown?
+  jobStats   UserJob?
+  inventory  UserInventory[]
+  tools      UserTool[]
+  pets       UserPet[]
+
+  @@map("users")
+}
+
+// =============================================
+//  USER ECONOMY
+// =============================================
+model UserEconomy {
+  jid            String  @id
+
+  // ── Money ──
+  saldo          Float   @default(0)
+  pengeluaran    Float   @default(0)
+  money          Float   @default(0)
+  bank           Float   @default(0)
+  balance        Float   @default(0)
+
+  // ── Currency / Tokens ──
+  chip           BigInt  @default(0)
+  tiketcoin      BigInt  @default(0)
+  poin           BigInt  @default(0)
+  litecoin       BigInt  @default(0)
+  gems           BigInt  @default(0)
+  cupon          BigInt  @default(0)
+
+  // ── E-Wallet ──
+  dana           BigInt  @default(0)
+  gopay          BigInt  @default(0)
+  ovo            BigInt  @default(0)
+
+  // ── Valuables ──
+  diamond        BigInt  @default(0)
+  emerald        BigInt  @default(0)
+  berlian        BigInt  @default(0)
+  iron           BigInt  @default(0)
+  emas           BigInt  @default(0)
+  arlok          BigInt  @default(0)
+
+  // ── Infrastructure / Building ──
+  bisnis         BigInt  @default(0)
+  berbisnis      BigInt  @default(0)
+  rumahsakit     BigInt  @default(0)
+  fortress       BigInt  @default(0)
+  shield         Boolean @default(false)
+  pertanian      BigInt  @default(0)
+  pertambangan   BigInt  @default(0)
+  camptroops     BigInt  @default(0)
+  tambang        BigInt  @default(0)
+  penduduk       BigInt  @default(0)
+  archer         BigInt  @default(0)
+
+  // ── Content Creator / Taxi ──
+  subscribers    BigInt  @default(0)
+  viewers        BigInt  @default(0)
+  like           BigInt  @default(0)
+  playButton     BigInt  @default(0)
+  taxi           BigInt  @default(0)
+
+  // ── Gacha Rarity Items ──
+  common         BigInt  @default(0)
+  as             BigInt  @default(0)
+  uncommon       BigInt  @default(0)
+  mythic         BigInt  @default(0)
+  legendary      BigInt  @default(0)
+  glory          BigInt  @default(0)
+  enchant        BigInt  @default(0)
+  pet            BigInt  @default(0)
+  psepick        BigInt  @default(0)
+  psenjata       BigInt  @default(0)
+
+  user User @relation(fields: [jid], references: [jid], onDelete: Cascade)
+
+  @@map("user_economy")
+}
+
+// =============================================
+//  USER RPG
+// =============================================
+model UserRpg {
+  jid             String  @id
+
+  // ── Vital Stats ──
+  healt          BigInt    @default(100)
+  health         BigInt    @default(100)
+  energi         BigInt    @default(100)
+  power          BigInt    @default(100)
+  stamina        BigInt    @default(100)
+  haus           BigInt    @default(100)
+  laper          BigInt    @default(100)
+  title          BigInt    @default(0)
+  titlein         String  @default("Belum Ada")
+
+  // ── Social Profile ──
+  ultah           String  @default("")
+  pasangan        String  @default("")
+  sahabat         String  @default("")
+  location        String  @default("Gubuk")
+  husbu           String  @default("Belum Di Set")
+  waifu           String  @default("Belum Di Set")
+
+  // ── Follow System ──
+  follow          BigInt  @default(0)
+  lastfollow      BigInt  @default(0)
+  followers       BigInt  @default(0)
+
+  // ── Activity Counters ──
+  pc              BigInt  @default(0)
+  korbanngocok    BigInt  @default(0)
+  ngewe           BigInt  @default(0)
+  jualan          BigInt  @default(0)
+  ngocokk         BigInt  @default(0)
+  antarpaket      BigInt  @default(0)
+
+  // ── Job Levels ──
+  ojekk           BigInt  @default(0)
+  polisi          BigInt  @default(0)
+  ojek            BigInt  @default(0)
+  pedagang        BigInt  @default(0)
+  dokter          BigInt  @default(0)
+  petani          BigInt  @default(0)
+  montir          BigInt  @default(0)
+  kuli            BigInt  @default(0)
+
+  // ── Trophy ──
+  trofi           BigInt  @default(0)
+  rtrofi          String  @default("Perunggu")
+  troopcamp       BigInt  @default(0)
+
+  // ── Combat Stats ──
+  attack         BigInt    @default(0)
+  strenght       BigInt    @default(0)
+  speed          BigInt    @default(0)
+  defense        BigInt    @default(0)
+  regeneration   BigInt    @default(0)
+
+  // ── Demon Slayer / RPG Class ──
+  skill           String  @default("")
+  korps           String  @default("")
+  korpsgrade      String  @default("")
+  breaths         String  @default("")
+  magic           String  @default("")
+  demon           String  @default("")
+  darahiblis      BigInt  @default(0)
+  demonblood      BigInt  @default(0)
+  demonkill       BigInt  @default(0)
+  hashirakill     BigInt  @default(0)
+  alldemonkill    BigInt  @default(0)
+  allhashirakill  BigInt  @default(0)
+
+  // ── RPG Resources ──
+  ramuan          BigInt  @default(0)
+  string          BigInt  @default(0)
+  eleksirb        BigInt  @default(0)
+  shadow          BigInt  @default(0)
+  antispam        BigInt  @default(0)
+  antispamlastclaim BigInt @default(0)
+  healthmonster   BigInt  @default(0)
+
+  // ── Fishing & Tools ──
+  pancing         BigInt  @default(0)
+  pancingan       BigInt  @default(0)
+  totalPancingan  BigInt  @default(0)
+  anakpancingan   BigInt  @default(0)
+  umpan           BigInt  @default(0)
+  sampah          BigInt  @default(0)
+  potion          BigInt  @default(0)
+
+  user User @relation(fields: [jid], references: [jid], onDelete: Cascade)
+
+  @@map("user_rpg")
+}
+
+// =============================================
+//  USER COOLDOWN (all last* timestamps)
+// =============================================
+model UserCooldown {
+  jid                 String  @id
+
+  lastseen            BigInt  @default(0)
+  lastSetStatus       BigInt  @default(0)
+  lastIstigfar        BigInt  @default(0)
+  lastclaim           BigInt  @default(0)
+  judilast            BigInt  @default(0)
+  lastnambang         BigInt  @default(0)
+  lastnebang          BigInt  @default(0)
+  lastkerja           BigInt  @default(0)
+  lastmaling          BigInt  @default(0)
+  lastbunuhi          BigInt  @default(0)
+  lastbisnis          BigInt  @default(0)
+  lastberbisnis       BigInt  @default(0)
+  lastmancing         BigInt  @default(0)
+  lastramuanclaim     BigInt  @default(0)
+  lastgemclaim        BigInt  @default(0)
+  lastpotionclaim     BigInt  @default(0)
+  laststringclaim     BigInt  @default(0)
+  lastswordclaim      BigInt  @default(0)
+  lastweaponclaim     BigInt  @default(0)
+  lastironclaim       BigInt  @default(0)
+  lastmancingclaim    BigInt  @default(0)
+  lastadventure       BigInt  @default(0)
+  lastberburu         BigInt  @default(0)
+  lastkill            BigInt  @default(0)
+  lastfishing         BigInt  @default(0)
+  lastdungeon         BigInt  @default(0)
+  lastwar             BigInt  @default(0)
+  lastsda             BigInt  @default(0)
+  lastberbru          BigInt  @default(0)
+  lastduel            BigInt  @default(0)
+  lastjb              BigInt  @default(0)
+  lastmining          BigInt  @default(0)
+  lasthunt            BigInt  @default(0)
+  lasthun             BigInt  @default(0)
+  lastngocok          BigInt  @default(0)
+  lastgift            BigInt  @default(0)
+  lastrob             BigInt  @default(0)
+  lastngojek          BigInt  @default(0)
+  lastngewe           BigInt  @default(0)
+  lastjualan          BigInt  @default(0)
+  lastngocokk         BigInt  @default(0)
+  lastgrab            BigInt  @default(0)
+  lastberkebon        BigInt  @default(0)
+  lastcodereg         BigInt  @default(0)
+  lastdagang          BigInt  @default(0)
+  lasthourly          BigInt  @default(0)
+  lastweekly          BigInt  @default(0)
+  lastyearly          BigInt  @default(0)
+  lastmonthly         BigInt  @default(0)
+  lastturu            BigInt  @default(0)
+  lastbansos          BigInt  @default(0)
+  lastrampok          BigInt  @default(0)
+  lastngaji           BigInt  @default(0)
+  lastlonte           BigInt  @default(0)
+  lastkoboy           BigInt  @default(0)
+  lastdate            BigInt  @default(0)
+  lasttambang         BigInt  @default(0)
+  lastngepet          BigInt  @default(0)
+  lasttaxi            BigInt  @default(0)
+  lastyoutuber        BigInt  @default(0)
+  lastbossbattle      BigInt  @default(0)
+  lastberbisnis2      BigInt  @default(0)
+  lastBirthday        String  @default("") 
+  lastLeaveG          BigInt  @default(0)
+
+  user User @relation(fields: [jid], references: [jid], onDelete: Cascade)
+
+  @@map("user_cooldown")
+}
+
+// =============================================
+//  USER JOB STATS (kerja* & pekerjaan* counters)
+// =============================================
+model UserJob {
+  jid                  String @id
+
+  // ── Kerja Progress ──
+  kerjasatu           BigInt   @default(0)
+  kerjadua            BigInt   @default(0)
+  kerjatiga           BigInt   @default(0)
+  kerjaempat          BigInt   @default(0)
+  kerjalima           BigInt   @default(0)
+  kerjaenam           BigInt   @default(0)
+  kerjatujuh          BigInt   @default(0)
+  kerjadelapan        BigInt   @default(0)
+  kerjasembilan       BigInt   @default(0)
+  kerjasepuluh        BigInt   @default(0)
+  kerjasebelas        BigInt   @default(0)
+  kerjaduabelas       BigInt   @default(0)
+  kerjatigabelas      BigInt   @default(0)
+  kerjaempatbelas     BigInt   @default(0)
+  kerjalimabelas      BigInt   @default(0)
+
+  // ── Pekerjaan Level ──
+  pekerjaansatu       BigInt   @default(0)
+  pekerjaandua        BigInt   @default(0)
+  pekerjaantiga       BigInt   @default(0)
+  pekerjaanempat      BigInt   @default(0)
+  pekerjaanlima       BigInt   @default(0)
+  pekerjaanenam       BigInt   @default(0)
+  pekerjaantujuh      BigInt   @default(0)
+  pekerjaandelapan    BigInt   @default(0)
+  pekerjaansembilan   BigInt   @default(0)
+  pekerjaansepuluh    BigInt   @default(0)
+  pekerjaansebelas    BigInt   @default(0)
+  pekerjaanduabelas   BigInt   @default(0)
+  pekerjaantigabelas  BigInt   @default(0)
+  pekerjaanempatbelas BigInt   @default(0)
+  pekerjaanlimabelas  BigInt   @default(0)
+
+  user User @relation(fields: [jid], references: [jid], onDelete: Cascade)
+
+  @@map("user_job")
+}
+
+// =============================================
+//  USER INVENTORY (items with quantity)
+// =============================================
+model UserInventory {
+  id          BigInt   @id @default(autoincrement())
+  jid          String
+  itemName     String
+  itemCategory String @default("resource")
+  quantity     BigInt @default(0)
+
+  user User @relation(fields: [jid], references: [jid], onDelete: Cascade)
+
+  @@unique([jid, itemName])
+  @@map("user_inventory")
+}
+
+// =============================================
+//  USER TOOL (tools with durability)
+// =============================================
+model UserTool {
+  id        BigInt   @id @default(autoincrement())
+  jid        String
+  toolName   String
+  owned     BigInt   @default(0)
+  durability BigInt   @default(0)
+
+  user User @relation(fields: [jid], references: [jid], onDelete: Cascade)
+
+  @@unique([jid, toolName])
+  @@map("user_tools")
+}
+
+// =============================================
+//  USER PET
+// =============================================
+model UserPet {
+  id       BigInt   @id @default(autoincrement())
+  jid       String
+  petName   String
+  count    BigInt   @default(0)
+  baby     BigInt   @default(0)
+  exp       BigInt @default(0)
+  food      BigInt @default(0)
+  lastClaim BigInt @default(0)
+
+  user User @relation(fields: [jid], references: [jid], onDelete: Cascade)
+
+  @@unique([jid, petName])
+  @@map("user_pets")
+}
+
+// =============================================
+//  CHAT
+// =============================================
+model Chat {
+  chatId              String  @id
+  onlyAdmin           Boolean @default(false)
+  isBanned            Boolean @default(false)
+  welcome             Boolean @default(true)
+  welcometype        BigInt    @default(1)
+  detect              Boolean @default(false)
+  isBannedTime        Boolean @default(false)
+  mute                Boolean @default(false)
+  listStr             String  @default("{}") @db.LongText
+  sWelcome            String  @default("Hai, @user!\nSelamat datang di grup @subject\n\n@desc") @db.Text
+  sBye                String  @default("Selamat tinggal @user!") @db.Text
+  sPromote            String  @default("") @db.Text
+  sDemote             String  @default("") @db.Text
+  delete              Boolean @default(true)
+  antiLink            Boolean @default(true)
+  antiLinknokick      Boolean @default(false)
+  antiSticker         Boolean @default(false)
+  antiStickernokick   Boolean @default(false)
+  viewonce            Boolean @default(false)
+  antiToxic           Boolean @default(false)
+  antiDelete          Boolean @default(false)
+  antibot             Boolean @default(false)
+  expired             BigInt  @default(0)
+  memgc               String  @default("{}") @db.LongText
+  blacklistUsers      String  @default("{}") @db.LongText
+  rpg                 Boolean @default(false)
+
+  antilinkig          Boolean @default(false)
+  antilinkignokick    Boolean @default(false)
+  antilinkfb          Boolean @default(false)
+  antilinkfbnokick    Boolean @default(false)
+  antilinktwit        Boolean @default(false)
+  antilinktwitnokick  Boolean @default(false)
+  antilinkyt          Boolean @default(false)
+  antilinkytnokick    Boolean @default(false)
+  antilinktele        Boolean @default(false)
+  antilinktelenokick  Boolean @default(false)
+  antilinkwame        Boolean @default(false)
+  antilinkwamenokick  Boolean @default(false)
+  antilinkall         Boolean @default(false)
+  antilinkallnokick   Boolean @default(false)
+  antilinktt          Boolean @default(false)
+  antilinkttnokick    Boolean @default(false)
+
+  @@map("chats")
+}
+
+// =============================================
+//  GUILD
+// =============================================
+model Guild {
+  id          String   @id
+  name        String
+  isPrivate   Boolean  @default(false)
+  owner       String   @unique
+  createdAt   DateTime @default(now())
+  level       Int      @default(1)
+  exp         Int      @default(0)
+  eliksir     Int      @default(0)
+  harta       BigInt   @default(0)
+  guardian    String?  
+  attack      Int      @default(0)
+  staff       Json     @default("[]")
+  waitingRoom Json     @default("[]")
+  members     Json     @default("[]")
+  donasi      Json     @default("{}")
+  storage     Json     @default("{}")
+  aliansi     Json     @default("[]")
+  
+  @@map("guilds")
+}
+
+// =============================================
+//  COMMAND STATS
+// =============================================
+model CommandStats {
+  pluginName  String @id
+  total      BigInt   @default(0)
+  success    BigInt   @default(0)
+  last        BigInt @default(0)
+  lastSuccess BigInt @default(0)
+
+  @@map("command_stats")
+}
+
+// =============================================
+//  STAFF ACTIVITY
+// =============================================
+model StaffActivity {
+  jid          String @id
+  name         String
+  role         String
+  dailyCmds    Int    @default(0)
+  modCmds      Int    @default(0)
+  inactiveDays Int    @default(0)
+  lastResetDay String
+
+  @@map("staff_activity")
+}
+
+// =============================================
+//  BOT OWNERSHIP (Config)
+// =============================================
+model BotOwnership {
+  id     String @id @default("Official")
+  owner  String
+  staff  Json   @default("[]")
+  bots   Json   @default("[]")
+  names  Json   @default("{}")
+
+  @@map("bot_ownership")
+}
+
+// =============================================
+//  BURSA MANAGEMENT
+// =============================================
+model Bursa {
+  id              String  @id @default(cuid())
+  ownerJid        String  @unique
+  ticker          String  @unique
+  name            String
+  price           Float   @default(0)
+  sharesAvailable BigInt  @default(0)
+  totalShares     BigInt  @default(0)
+  funds           Float   @default(0)
+
+  @@map("bursa")
+}
+
+// =============================================
+//  MARKET ASSETS
+// =============================================
+model MarketAsset {
+  id            String  @id // e.g. "iron", "gold", "diamond"
+  name          String
+  basePrice     Float   @default(0)
+  volatility    Float   @default(0)
+  vLiq          Float   @default(0)
+  currentPrice  Float   @default(0)
+  previousPrice Float   @default(0)
+
+  @@map("market_assets")
+}
+
+model MarketGlobal {
+  id         Int    @id @default(1)
+  lastUpdate BigInt @default(0)
+
+  @@map("market_global")
+}
+
+// =============================================
+//  GIVEAWAY & DAGET
+// =============================================
+model Giveaway {
+  id              String  @id
+  type            String
+  isDaget         Boolean @default(false)
+  amount          Float?
+  totalAmount     Float?
+  remainingAmount Float?
+  totalReceivers  Int     @default(0)
+  creator         String
+  status          String  @default("open")
+  closedAt        BigInt?
+  
+  // JSON structures
+  participants    Json?   @default("[]")
+  claimed         Json?   @default("[]")
+
+  @@map("giveaway")
+}
+
+// =============================================
+//  REDEEM CODES
+// =============================================
+model RedeemCode {
+  code      String  @id
+  creator   String
+  since     BigInt  @default(0)
+  reward    Json    @default("{}")
+  claim     Json    @default("[]")
+  expired   BigInt  @default(0)
+  limituser Int     @default(0)
+  forWho    Json    @default("[]")
+  blocked   Json    @default("[]")
+
+  @@map("redeem_codes")
+}
+
+model ModRedeemState {
+  id          Int     @id @default(1)
+  weeklyCount Int     @default(0)
+  dailyCount  Json    @default("{}")
+  resetWeekly BigInt  @default(0)
+
+  @@map("mod_redeem_state")
+}

@@ -1,0 +1,28 @@
+{
+  "redeems": {
+    "OA1B48E9": {
+      "creator": "6282153017890@s.whatsapp.net",
+      "since": 1773236798052,
+      "data": {
+        "reward": {
+          "money": 1,
+          "exp": 1,
+          "limit": 1,
+          "saldo": 1
+        },
+        "claim": [],
+        "expired": 1773323198052,
+        "limituser": 1,
+        "forWho": [],
+        "blocked": []
+      }
+    }
+  },
+  "moderatorCodes": {
+    "weeklyCount": 0,
+    "dailyCount": {
+      "2026-03-11": {}
+    },
+    "resetWeekly": 1773841598051
+  }
+}

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HuTao BOT | Web Dashboard</title>
+    <!-- Tailwind CSS (via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,0.2) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,0.2) 0, transparent 50%);
+            min-height: 100vh;
+        }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08); /* slight border for glass effect */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 1rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .glass-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .gradient-text {
+            background: linear-gradient(to right, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .loader {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-bottom-color: #8b5cf6;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .skeleton {
+            animation: pulse-bg 1.5s infinite;
+        }
+
+        @keyframes pulse-bg {
+            0%, 100% { background-color: rgba(255, 255, 255, 0.05); }
+            50% { background-color: rgba(255, 255, 255, 0.1); }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 flex flex-col items-center">
+    
+    <header class="w-full max-w-6xl flex justify-between items-center py-6 mb-8 border-b border-gray-800">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 rounded-full to-purple-600 flex items-center justify-center text-xl font-bold shadow-lg shadow-indigo-500/20">
+                H
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight">HuTao <span class="gradient-text">Dashboard</span></h1>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="relative flex h-3 w-3">
+              <span id="status-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span id="status-dot" class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+            </span>
+            <span id="bot-status" class="text-sm font-medium text-gray-300">Loading...</span>
+        </div>
+    </header>
+
+    <main class="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        
+        <!-- Bot Info -->
+        <div class="glass-card p-6 flex flex-col justify-between col-span-1 md:col-span-2 lg:col-span-4 bg-gradient-to-r from-indigo-900/40 to-purple-900/40 border-indigo-500/20">
+            <div>
+                <h2 class="text-sm font-semibold text-indigo-300 uppercase tracking-wider mb-1">Bot Name</h2>
+                <div class="text-3xl font-bold text-white flex items-center gap-3" id="bot-name">
+                    <div class="h-6 w-32 rounded skeleton"></div>
+                </div>
+            </div>
+            <div class="mt-6 flex flex-wrap gap-6">
+                <div>
+                    <p class="text-sm text-gray-400 mb-1">Uptime</p>
+                    <p class="text-xl font-medium" id="uptime">--:--:--</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-400 mb-1">Loaded Plugins</p>
+                    <p class="text-xl font-medium" id="plugins">--</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-400 mb-1">RAM Usage</p>
+                    <p class="text-xl font-medium" id="ram">-- MB</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Detail Cards -->
+        <div class="glass-card p-6 flex flex-col">
+            <div class="w-10 h-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/-2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <h3 class="text-gray-400 text-sm font-medium">Total Users</h3>
+            <p class="text-3xl font-bold mt-1" id="total-users">--</p>
+        </div>
+
+        <div class="glass-card p-6 flex flex-col">
+            <div class="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </div>
+            <h3 class="text-gray-400 text-sm font-medium">Registered Users</h3>
+            <p class="text-3xl font-bold mt-1" id="registered-users">--</p>
+        </div>
+
+        <div class="glass-card p-6 flex flex-col">
+            <div class="w-10 h-10 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            </div>
+            <h3 class="text-gray-400 text-sm font-medium">Premium Users</h3>
+            <p class="text-3xl font-bold mt-1" id="premium-users">--</p>
+        </div>
+
+        <div class="glass-card p-6 flex flex-col">
+            <div class="w-10 h-10 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+            </div>
+            <h3 class="text-gray-400 text-sm font-medium">Banned Users</h3>
+            <p class="text-3xl font-bold mt-1" id="banned-users">--</p>
+        </div>
+
+    </main>
+
+    <footer class="mt-12 text-center text-gray-500 text-sm">
+        <p>Auto-refreshing every 5 seconds • Hubot-WA Platform</p>
+    </footer>
+
+    <script>
+        function formatUptime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${h}h ${m}m ${s}s`;
+        }
+
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                
+                // Bot Status
+                document.getElementById('bot-name').innerText = data.botName;
+                document.getElementById('bot-status').innerText = data.botStatus;
+                
+                if (data.botStatus === 'Online') {
+                    document.getElementById('status-dot').className = 'relative inline-flex rounded-full h-3 w-3 bg-green-500';
+                    document.getElementById('status-ping').className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75';
+                } else {
+                    document.getElementById('status-dot').className = 'relative inline-flex rounded-full h-3 w-3 bg-red-500';
+                    document.getElementById('status-ping').className = 'hidden';
+                }
+
+                // Stats
+                document.getElementById('uptime').innerText = formatUptime(data.uptime);
+                document.getElementById('plugins').innerText = data.plugins;
+                document.getElementById('ram').innerText = `${data.memory.rss} MB`;
+                
+                // Users
+                document.getElementById('total-users').innerText = data.users.total.toLocaleString();
+                document.getElementById('registered-users').innerText = data.users.registered.toLocaleString();
+                document.getElementById('premium-users').innerText = data.users.premium.toLocaleString();
+                document.getElementById('banned-users').innerText = data.users.banned.toLocaleString();
+                
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+            }
+        }
+
+        // Fetch immediately, then every 5 seconds
+        fetchStats();
+        setInterval(fetchStats, 5000);
+    </script>
+</body>
+</html>
