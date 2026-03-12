@@ -1,0 +1,86 @@
+//rpg-battlepet
+const { getUser, updateEconomy } = require('../../lib/database')
+const pets = ['kucing', 'anjing', 'serigala', 'phonix', 'rubah']
+
+let handler = async (m, { conn, text: txt, usedPrefix, participants }) => {
+    conn.battlepet = conn.battlepet ? conn.battlepet : {}
+    let text = (txt || '').toLowerCase()
+    let id = 'battle-' + m.sender
+    
+    let user = await getUser(m.sender)
+    if (!user) return
+
+    let item = pets.filter(v => v in user && typeof user[v] == 'number')
+    if (!pets.includes(text)) return m.reply(`List Pet :\n${pets.map(v => { return `• ${v}` }).join('\n') }`)
+    if (user[text] == 0 || !user[text]) return m.reply('Kamu Tidak Memiliki Pet Ini!')
+    if (typeof conn.battlepet[id] != "undefined" && conn.battlepet[id] == true) return m.reply(`Kamu masih berada di battle-pet.`)
+    
+    let users = participants.map(u => u.id)
+    var lawan = users[Math.floor(users.length * Math.random())]
+    let targetLawan = await getUser(lawan)
+
+    // Limit infinite loop kalau grup sepi
+    let attempts = 0
+    while ((!targetLawan || lawan == m.sender) && attempts < 10) {
+        lawan = users[Math.floor(users.length * Math.random())]
+        targetLawan = await getUser(lawan)
+        attempts++
+    }
+    
+    if (!targetLawan || lawan == m.sender) return m.reply('Tidak ada lawan yang valid di grup ini.')
+
+    m.reply(`*Kamu* (${text} level ${user[text]}) menantang *'@' +${conn.getName(lawan)}* (${text} level ${targetLawan[text] || 0}) dan sedang dalam pertarungan.\n\nTunggu 5 menit lagi dan lihat siapa yg menang.`)
+    conn.battlepet[id] = true
+
+    await delay(300000) // Nunggu 5 menit
+
+    let kesempatan = []
+    for (let i = 0; i < user[text]; i++) kesempatan.push(m.sender)
+    for (let i = 0; i < (targetLawan[text] || 0); i++) kesempatan.push(lawan)
+
+    let pointPemain = 0
+    let pointLawan = 0
+    if (kesempatan.length > 0) {
+        for (let i = 0; i < 10; i++) {
+            let unggul = getRandom(0, kesempatan.length - 1)
+            if (kesempatan[unggul] == m.sender) pointPemain += 1
+            else pointLawan += 1
+        }
+    }
+
+    // PENTING: Ambil data terbaru karena 5 menit udah berlalu
+    let currentUser = await getUser(m.sender)
+
+    if (pointPemain > pointLawan) {
+        let hadiah = (pointPemain - pointLawan) * 10000
+        await updateEconomy(m.sender, { money: currentUser.money + hadiah, limit: currentUser.limit + 1 })
+        
+        m.reply(`*${conn.getName(m.sender)}* [${pointPemain * 10}] - [${pointLawan * 10}] *${conn.getName(lawan)}*\n\n*Kamu* (${text} level ${user[text]}) menang melawan *${conn.getName(lawan)}* (${text} level ${targetLawan[text] || 0}) karena kamu ${alasanMenang[getRandom(0, alasanMenang.length - 1)]}\n\nHadiah . ${hadiah.toLocaleString()}\n+1 Limit`)
+    } else if (pointPemain < pointLawan) {
+        let denda = (pointLawan - pointPemain) * 100000
+        await updateEconomy(m.sender, { money: currentUser.money - denda, limit: currentUser.limit + 1 })
+        
+        m.reply(`*${conn.getName(m.sender)}* [${pointPemain * 10}] - [${pointLawan * 10}] *${conn.getName(lawan)}*\n\n*Kamu* (${text} level ${user[text]}) kalah melawan *${conn.getName(lawan)}* (${text} level ${targetLawan[text] || 0}) karena kamu ${alasanKalah[getRandom(0, alasanKalah.length - 1)]}\n\nMoney kamu berkurang ${denda.toLocaleString()}\n+1 Limit`)
+    } else {
+        m.reply(`*${conn.getName(m.sender)}* [${pointPemain * 10}] - [${pointLawan * 10}] *${conn.getName(lawan)}*\n\nHasil imbang kak, ga dapet apa apa`)
+    }
+
+    delete conn.battlepet[id]
+}
+
+handler.help = ['battlepet']
+handler.tags = ['rpg']
+handler.command = /^(battlepet)$/i
+handler.register = true
+handler.group = true
+handler.rpg = true
+module.exports = handler
+
+function getRandom(min, max) {
+    min = Math.ceil(min)
+    max = Math.floor(max)
+    return Math.floor(Math.random() * (max - min + 1)) + min
+}
+const alasanKalah = ['Noob', 'Cupu', 'Kurang hebat', 'Ampas kalahan', 'Gembel kalahan', 'Pet Jelek', 'Level Kecil']
+const alasanMenang = ['Hebat', 'Pro', 'Master Game', 'Legenda game', 'Sangat Pro', 'Rajin Nge-push']
+const delay = time => new Promise(res => setTimeout(res, time));

@@ -1,0 +1,55 @@
+{
+  "giveaway": {
+    "5AD255A3": {
+      "type": "money",
+      "amount": 1,
+      "totalReceivers": 1,
+      "creator": "6288293398140@s.whatsapp.net",
+      "participants": [
+        "6283823019643@s.whatsapp.net"
+      ],
+      "status": "closed",
+      "closedAt": 1773220027610
+    },
+    "1E3AD274": {
+      "type": "money",
+      "amount": 1,
+      "totalReceivers": 1,
+      "creator": "6288293398140@s.whatsapp.net",
+      "participants": [],
+      "status": "open"
+    }
+  },
+  "daget": {
+    "4A160261": {
+      "type": "money",
+      "totalAmount": 1,
+      "remainingAmount": 0,
+      "totalReceivers": 1,
+      "claimed": [
+        {
+          "jid": "6288293398140@s.whatsapp.net",
+          "amount": 1
+        }
+      ],
+      "creator": "6288293398140@s.whatsapp.net",
+      "status": "closed",
+      "closedAt": 1773219927675
+    },
+    "0792A269": {
+      "type": "money",
+      "totalAmount": 1,
+      "remainingAmount": 0,
+      "totalReceivers": 1,
+      "claimed": [
+        {
+          "jid": "6288293398140@s.whatsapp.net",
+          "amount": 1
+        }
+      ],
+      "creator": "6288293398140@s.whatsapp.net",
+      "status": "closed",
+      "closedAt": 1773219890342
+    }
+  }
+}

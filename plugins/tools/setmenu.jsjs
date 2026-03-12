@@ -1,0 +1,47 @@
+let handler = async (m, { conn, text, usedPrefix, command }) => {
+    // Validasi input angka 1 sampai 10
+    if (!text || !/^([1-9]|10)$/.test(text)) {
+        let listMenu = `*Gagal!* ❌
+
+Silakan pilih angka 1 sampai 10 untuk mengganti tampilan menu.
+
+*Contoh Penggunaan:*
+${usedPrefix + command} 7
+
+*Pilihan Style:*
+1. Default (Kotak Rapi)
+2. Minimalist (Simple Garis)
+3. Aesthetic (Bubble)
+4. Cyberpunk (Garis Tebal)
+5. Classic (Teks Biasa)
+6. Royal (Majestic ❖)
+7. Japanese (Kaomoji ⌑)
+8. Floral (Cute ꕤ)
+9. Gothic (Dark ✠)
+10. Hacker (Terminal ~#)`
+
+        return m.reply(listMenu)
+    }
+
+    let styleTerpilih = parseInt(text)
+    
+    // Simpan pilihan ke memori global sementara
+    global.menuStyle = styleTerpilih
+
+    let namaStyle = [
+        'Default', 'Minimalist', 'Aesthetic', 'Cyberpunk', 'Classic', 
+        'Royal', 'Japanese', 'Floral', 'Gothic', 'Hacker Terminal'
+    ][styleTerpilih - 1]
+
+    m.reply(`✅ *Berhasil!*\n\nTampilan menu telah diubah ke style *${namaStyle}* (Style ${styleTerpilih}).\n\nKetik *.menu* untuk melihat perubahannya.`)
+}
+
+handler.help = ['setmenu <1-10>']
+handler.tags = ['owner']
+handler.command = /^(setmenu|ubahmenu)$/i
+
+// Buat command ini hanya bisa dipakai oleh Owner
+handler.owner = true 
+
+module.exports = handler
+
