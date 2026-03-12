@@ -367,7 +367,7 @@ app.get('/api/stats', async (req, res) => {
     const totalUsers = await db.user.count()
     const registeredUsers = await db.user.count({ where: { registered: true } })
     const bannedUsers = await db.user.count({ where: { banned: true } })
-    const premiumUsers = await db.user.count({ where: { premium: true } })
+    const premiumUsers = await db.user.count({ where: { premiumTime: { gt: BigInt(Date.now()) } } })
     
     const botConnected = !!(global.conn && global.conn.user)
     const uptime = process.uptime()
