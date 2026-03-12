@@ -492,6 +492,7 @@ model Chat {
   rpg                 Boolean @default(false)
 
   antilinkig          Boolean @default(false)
+  warngempa           Boolean @default(false)
   antilinkignokick    Boolean @default(false)
   antilinkfb          Boolean @default(false)
   antilinkfbnokick    Boolean @default(false)

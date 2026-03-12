@@ -29,7 +29,7 @@ global.selfMode = false
 global.errorsend = true
 
 // Server
-global.serverPort = process.env.PORT || 3000
+global.serverPort = process.env.SERVER_PORT || process.env.PORT || 3000
 
 // Messages
 global.welcomeMsg = 'Hai, @user!\nSelamat datang di grup @subject\n\n@desc'
