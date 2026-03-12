@@ -1,8 +1,8 @@
 const { getStaff, getOwnerDB } = require('../../lib/staffManager')
 
 let handler = async (m) => {
-    let ownerData = getOwnerDB();
-    let staffData = getStaff();
+    let ownerData = await getOwnerDB();
+    let staffData = await getStaff();
 
     let groups = {};
 
@@ -10,15 +10,15 @@ let handler = async (m) => {
     // 1. AMBIL KASTA DEWA (Owner & Admin)
     // ==========================================
     for (let manKey in ownerData) {
-        let properName = manKey; 
+        let properName = manKey;
         if (!groups[properName]) groups[properName] = [];
-        
+
         let data = ownerData[manKey];
-        
+
         if (data.owner) {
             groups[properName].push({ jid: data.owner, name: data.names[data.owner] || 'Unknown', role: 'Owner', weight: 4 });
         }
-        
+
         if (data.staff) {
             data.staff.forEach(s => {
                 groups[properName].push({ jid: s, name: data.names[s] || 'Unknown', role: 'Admin', weight: 3 });
@@ -32,13 +32,13 @@ let handler = async (m) => {
     for (let jid in staffData) {
         let s = staffData[jid];
         let manKey = s.management || 'Lainnya';
-        
+
         if (!groups[manKey]) groups[manKey] = [];
-        
+
         // Cek duplikat (kalau dia udah ada di Kasta Dewa, skip aja)
         let isDuplicate = groups[manKey].find(v => v.jid === jid);
         if (!isDuplicate) {
-                        // Tentukan Bobot Pangkat
+            // Tentukan Bobot Pangkat
             let bobot = 1; // Default: Support
             let currentRole = s.role.toLowerCase();
             if (currentRole.includes('mod')) bobot = 2;
@@ -46,10 +46,10 @@ let handler = async (m) => {
             if (manKey === 'Ready To Take' || currentRole.includes('trainee')) bobot = 0;
 
 
-            groups[manKey].push({ 
-                jid: jid, 
-                name: s.name, 
-                role: s.role, 
+            groups[manKey].push({
+                jid: jid,
+                name: s.name,
+                role: s.role,
                 weight: bobot
             });
         }
@@ -78,14 +78,14 @@ let handler = async (m) => {
         }
 
         teks += `*${title}*\n`;
-        
+
         // Urutkan orang di dalam grupnya dari pangkat tertinggi ke terendah
         groups[key].sort((a, b) => b.weight - a.weight);
 
         groups[key].forEach(s => {
             let number = s.jid.split('@')[0];
             let numberText = s.jid.includes('N/A') ? 'N/A' : number;
-            
+
             // Format List Utama Tanpa Bot Number
             teks += `• wa.me/${numberText} *${s.name}* (${s.role})\n`;
         });

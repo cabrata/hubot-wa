@@ -1,4 +1,4 @@
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
     let isOwner = global.owner?.includes(m.sender.split('@')[0]);
@@ -15,7 +15,12 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 
         await m.reply(`✅ *Berhasil update script:*\n\n\`\`\`\n${result}\n\`\`\`\n\n🔄 *Restarting bot...*`);
         setTimeout(() => {
-            process.exit(0); // Akan di-restart otomatis oleh PM2 atau daemon lain jika ada
+            const child = spawn(process.argv[0], process.argv.slice(1), {
+                detached: true,
+                stdio: 'inherit'
+            });
+            child.unref();
+            process.exit();
         }, 3000);
     } catch (e) {
         m.reply(`❌ *Gagal melakukan update:*\n\n\`\`\`\n${e.message}\n\`\`\``);
