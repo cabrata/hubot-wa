@@ -10,6 +10,9 @@ const {
 
 const { getStaff, saveStaff, checkDailyActivity } = require('./lib/staffManager')
 
+const { getUser } = require('./lib/database');
+const { checkAnomaly } = require('./lib/antiAbuse');
+
 const isNumber = (x) => typeof x === 'number' && !isNaN(x)
 const delay = (ms) => isNumber(ms) && new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -344,6 +347,53 @@ module.exports = {
             } catch (e) { 
                 console.error("[STAFF TRACKER ERROR]:", e);
             }
+            
+            // ==========================================
+// 🔴 1. CCTV NYALA (WAJIB di atas sebelum plugin jalan!)
+// ==========================================
+let userPre = await getUser(m.sender);
+let moneyPre = Number(userPre?.economy?.money || userPre?.money || 0);
+let pluginName = m.plugin || command || 'Fitur_Bot'; 
+
+// ==========================================
+// ⚙️ INI KODE EKSEKUSI BAWAAN BOT LU
+// ==========================================
+try {
+    await plugin(m, { conn, text, args, usedPrefix, command /* dll */ }); 
+} catch (e) {
+    console.error(e);
+}
+// ==========================================
+
+
+// ... (Kode-kode lain di handler lu) ...
+
+
+// ==========================================
+// 🟢 2. BAGIAN TRACKER & PENGHAKIMAN
+// ==========================================
+try {
+    if (m && m.plugin && !m.error) { 
+        // Ini kode pemecatan otomatis lu yang jalan tiap hari
+        await checkDailyActivity(this); 
+
+        // 👇 TARUH PENGECEKAN AI TEPAT DI BAWAHNYA
+        let userPost = await getUser(m.sender);
+        let moneyPost = Number(userPost?.economy?.money || userPost?.money || 0);
+        
+        await checkAnomaly(this, m, m.sender, moneyPre, moneyPost, pluginName);
+        // 👆 SELESAI PENGECEKAN AI
+
+        // ... (Bawahnya lanjut kode absen harian staff lu yang kemaren) ...
+        let staffData = getStaff();
+        if (staffData[m.sender]) {
+             // ... kode tracker kuli/dewa shield
+        }
+    }
+} catch (e) { 
+    console.error(e);
+}
+
 
 
             if (global.autoRead && m) await this.readMessages([m.key]).catch(() => { })
