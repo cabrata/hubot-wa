@@ -14,7 +14,7 @@ const BAN_LEVELS = [
 ];
 
 const CONFIG = {
-    SPAM_SCORE_LIMIT: 40,
+    SPAM_SCORE_LIMIT: 100,
     RESET_RECORD_TIME: 30 * 24 * 60 * 60 * 1000,
     SCORE_FAST: 15,
     SCORE_COPY: 25,
@@ -202,11 +202,11 @@ handler.before = async function all(m, { conn }) {
     
     let senderWa = m.sender.split('@')[0];
     const isOwner = global.owner.map(v => v.replace(/[^0-9]/g, '')).includes(senderWa);
-    const isMods = user.moderator || false;
-    const isTS = user.timSupport || false;
+  //  const isMods = user.moderator || false;
+//    const isTS = user.timSupport || false;
     const isPremium = user.premium && (Number(user.premium) > Date.now());
     
-    const isDewa = isOwner || isMods || isTS || isPremium;
+    const isDewa = isOwner || isPremium;
     let now = Date.now();
 
     // ==========================================

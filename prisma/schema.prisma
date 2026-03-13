@@ -554,13 +554,17 @@ model CommandStats {
 //  STAFF ACTIVITY
 // =============================================
 model StaffActivity {
-  jid          String @id
-  name         String
-  role         String
-  dailyCmds    Int    @default(0)
-  modCmds      Int    @default(0)
-  inactiveDays Int    @default(0)
-  lastResetDay String
+  jid           String @id
+  name          String
+  role          String
+  management    String @default("-")
+  age           String @default("-")
+  botNumber     String @default("-")
+  addedAt       BigInt @default(0)
+  dailyCmds     Int    @default(0)
+  modCmds       Int    @default(0)
+  inactiveDays  Int    @default(0)
+  lastResetDay  String @default("2026-01-01")
 
   @@map("staff_activity")
 }
