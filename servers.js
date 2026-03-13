@@ -369,6 +369,12 @@ app.get('/api/stats', async (req, res) => {
     const bannedUsers = await db.user.count({ where: { banned: true } })
     const premiumUsers = await db.user.count({ where: { premiumTime: { gt: BigInt(Date.now()) } } })
     
+    // Sum total chat commands processed
+    const cmdStats = await db.commandStats.aggregate({
+      _sum: { total: true }
+    })
+    const chatsProcessed = Number(cmdStats._sum.total || 0)
+
     const botConnected = !!(global.conn && global.conn.user)
     const uptime = process.uptime()
     const memory = process.memoryUsage()
@@ -387,6 +393,7 @@ app.get('/api/stats', async (req, res) => {
         banned: bannedUsers,
         premium: premiumUsers
       },
+      chatsProcessed: chatsProcessed,
       plugins: Object.keys(global.plugins || {}).length
     })
   } catch (e) {
