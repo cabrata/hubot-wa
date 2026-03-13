@@ -1,13 +1,9 @@
-// Asumsi lu punya fungsi buat ngambil semua user atau khusus user yang dibanned di database.js
-const { getAllUsers } = require('../../lib/database.js') 
+const { db } = require('../../lib/database.js') 
 
 let handler = async (m, { conn, usedPrefix }) => {
     try {
-        // Ambil semua user dari SQL
-        let users = await getAllUsers(); 
-        
-        // Filter cuma yang statusnya banned == true
-        let bannedUsers = users.filter(u => u.banned);
+        // Ambil user yang dibanned dari SQL
+        let bannedUsers = await db.user.findMany({ where: { banned: true } });
 
         if (bannedUsers.length === 0) {
             return conn.sendMessage(m.chat, { text: '✨ Wah, database bersih! Nggak ada user yang lagi kena banned.' }, { quoted: m });

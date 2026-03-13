@@ -9,8 +9,6 @@ const {
 } = require('./lib/database')
 
 const { getStaff, saveStaff, checkDailyActivity } = require('./lib/staffManager')
-
-const { getUser } = require('./lib/database');
 const { checkAnomaly } = require('./lib/antiAbuse');
 
 const isNumber = (x) => typeof x === 'number' && !isNaN(x)
@@ -73,6 +71,8 @@ module.exports = {
             //banned
             m.user = await getUser(m.sender);
             m.chatData = await getChat(m.chat);
+            m.moneyPre = Number(m.user?.economy?.money || m.user?.money || 0);
+
             if ((!isTS || !isMods) && ((m.user && m.user.banned) || (m.chatData && m.chatData.isBanned))) return;
             if (typeof m.text !== 'string') m.text = ''
 
@@ -306,18 +306,25 @@ module.exports = {
             try {
                 if (m && m.isCommand) require('./lib/print')(m, this)
             } catch (e) { }
-                                                // [SNIPPET TRACKER ABSEN STAFF]
+            // [SNIPPET TRACKER ABSEN STAFF & ANTI ABUSE]
             try {
                 if (m && m.plugin && !m.error) { // Hanya catat kalau command berhasil (gak error)
                     // Jalankan pengecekan harian
                     await checkDailyActivity(this);
 
+                    // 👇 PENGECEKAN AI (CCTV / ANTI ABUSE)
+                    let userPost = await getUser(m.sender);
+                    let moneyPost = Number(userPost?.economy?.money || userPost?.money || 0);
+                    let pluginName = m.plugin || 'Fitur_Bot';
+                    await checkAnomaly(this, m, m.sender, m.moneyPre, moneyPost, pluginName);
+                    // 👆 SELESAI PENGECEKAN AI
+
                     let staffData = getStaff();
                     if (staffData[m.sender]) {
-                        
+
                         let senderWa = m.sender.split('@')[0];
                         let isOwner = global.owner.map(v => v.replace(/[^0-9]/g, '')).includes(senderWa);
-                        
+
                         // 🔥 CEK PANGKAT DINAMIS (Gak perlu masukin nomor manual lagi!)
                         let roleStaff = staffData[m.sender].role ? staffData[m.sender].role.toLowerCase() : '';
                         let isSupervisor = roleStaff.includes('supervisor') || roleStaff.includes('hrd');
@@ -334,7 +341,7 @@ module.exports = {
                             // Cek apakah command yang dipakai adalah command admin/moderator
                             let executedPlugin = global.plugins[m.plugin];
                             let isModCommand = executedPlugin && (executedPlugin.admin || executedPlugin.moderator || executedPlugin.group);
-                            
+
                             if (isModCommand) {
                                 staffData[m.sender].activity.modCmds += 1;
                             }
@@ -344,57 +351,9 @@ module.exports = {
                         saveStaff(staffData);
                     }
                 }
-            } catch (e) { 
-                console.error("[STAFF TRACKER ERROR]:", e);
+            } catch (e) {
+                console.error("[STAFF TRACKER / CCTV ERROR]:", e);
             }
-            
-            // ==========================================
-// 🔴 1. CCTV NYALA (WAJIB di atas sebelum plugin jalan!)
-// ==========================================
-let userPre = await getUser(m.sender);
-let moneyPre = Number(userPre?.economy?.money || userPre?.money || 0);
-let pluginName = m.plugin || command || 'Fitur_Bot'; 
-
-// ==========================================
-// ⚙️ INI KODE EKSEKUSI BAWAAN BOT LU
-// ==========================================
-try {
-    await plugin(m, { conn, text, args, usedPrefix, command /* dll */ }); 
-} catch (e) {
-    console.error(e);
-}
-// ==========================================
-
-
-// ... (Kode-kode lain di handler lu) ...
-
-
-// ==========================================
-// 🟢 2. BAGIAN TRACKER & PENGHAKIMAN
-// ==========================================
-try {
-    if (m && m.plugin && !m.error) { 
-        // Ini kode pemecatan otomatis lu yang jalan tiap hari
-        await checkDailyActivity(this); 
-
-        // 👇 TARUH PENGECEKAN AI TEPAT DI BAWAHNYA
-        let userPost = await getUser(m.sender);
-        let moneyPost = Number(userPost?.economy?.money || userPost?.money || 0);
-        
-        await checkAnomaly(this, m, m.sender, moneyPre, moneyPost, pluginName);
-        // 👆 SELESAI PENGECEKAN AI
-
-        // ... (Bawahnya lanjut kode absen harian staff lu yang kemaren) ...
-        let staffData = getStaff();
-        if (staffData[m.sender]) {
-             // ... kode tracker kuli/dewa shield
-        }
-    }
-} catch (e) { 
-    console.error(e);
-}
-
-
 
             if (global.autoRead && m) await this.readMessages([m.key]).catch(() => { })
         }
