@@ -14,25 +14,25 @@ const BAN_LEVELS = [
 ];
 
 const CONFIG = {
-    SPAM_SCORE_LIMIT: 100,
+    SPAM_SCORE_LIMIT: 250,
     RESET_RECORD_TIME: 30 * 24 * 60 * 60 * 1000,
     SCORE_FAST: 15,
     SCORE_COPY: 25,
-    COOLDOWN_RATE: 2
+    COOLDOWN_RATE: 4
 };
 
 // ==========================================
 // 2. OTAK AI TRAFFIC & SERVER MONITORING
 // ==========================================
 const AI_CONFIG = {
-    MAX_RAM_MB: 1024, // 🔧 UBAH INI: Sesuaikan dengan limit RAM di Panel Pterodactyl lu (dalam MB)
-    MIN_RPS: 2,
-    MIN_RPM: 15,
+    MAX_RAM_MB: 1024, // 🔧 Sesuai config Pterodactyl lu
+    MIN_RPS: 3,
+    MIN_RPM: 30,
     MIN_RPH: 300,
     LEARN_RATE: 0.2,
     SPIKE_MULTIPLIER: 1.5,
-    BASE_PURGE_COOLDOWN: 5 * 60 * 1000, // 5 Menit
-    MAX_PURGE_COOLDOWN: 60 * 60 * 1000  // 1 Jam
+    BASE_PURGE_COOLDOWN: 5 * 60 * 1000, 
+    MAX_PURGE_COOLDOWN: 60 * 60 * 1000  
 };
 
 function getCpuInfo() {
@@ -61,6 +61,26 @@ global.botBusyUntil = global.botBusyUntil || 0;
 global.hasSentBusyMessage = global.hasSentBusyMessage || {};
 global.bannedChatsByAI = global.bannedChatsByAI || [];
 
+// --- [BARU] TOMBOL DARURAT GLOBAL UNTUK RATE LIMIT / ERROR CRITICAL ---
+global.triggerSystemLockdown = function(durationMs = 3 * 60 * 1000, reason = "Rate Overlimit") {
+    let now = Date.now();
+    // Kalau belum lockdown atau lockdown-nya kurang dari durasi baru, timpa!
+    if (global.botBusyUntil < now + durationMs) {
+        global.botBusyUntil = now + durationMs;
+        global.hasSentBusyMessage = {}; // Reset notifikasi biar dikirim ke grup/user yang ngechat
+        global.brainAI.threatLevel = 5; // Langsung naikkan siaga ke maksimal
+        console.log(`[BRAIN AI] 🚨 LOCKDOWN DARURAT DIAKTIFKAN! Alasan: ${reason}`);
+        
+        // Bersihkan cache biar server enteng sekalian
+        if (global.connCache) {
+            ['lastCmdTime', 'warnMacet', 'userCd', 'spamData'].forEach(key => {
+                if (global.connCache[key]) global.connCache[key] = {};
+            });
+        }
+        try { if (global.gc) global.gc(); } catch (e) {}
+    }
+};
+
 // ==========================================
 // 3. DETAK JANTUNG AI & SELF-CHECK MECHANISM
 // ==========================================
@@ -70,9 +90,8 @@ if (!global.aiInterval) {
         let now = Date.now();
         ai.ticks++;
 
-        // --- CEK CPU & RAM PTERODACTYL (Tiap 2 detik) ---
+        // --- CEK CPU & RAM PTERODACTYL ---
         if (ai.ticks % 2 === 0) {
-            // FIX: Pake memoryUsage.rss biar akurat ngebaca RAM bot di container Pterodactyl!
             let ramUsedMB = process.memoryUsage().rss / 1024 / 1024;
             let ramUsagePercent = (ramUsedMB / AI_CONFIG.MAX_RAM_MB) * 100;
 
@@ -83,8 +102,8 @@ if (!global.aiInterval) {
             ai.lastCpu = currentCpu;
 
             if (cpuUsage > 90 || ramUsagePercent > 90) {
-                ai.threatLevel = Math.max(ai.threatLevel, 5);
-                console.log(`[BRAIN AI] 🚨 SERVER OVERLOAD! CPU: ${cpuUsage}% | RAM: ${ramUsedMB.toFixed(0)}MB (${ramUsagePercent.toFixed(1)}%). Naikin ke SIAGA 5!`);
+                // Panggil tombol darurat dengan alasan CPU/RAM
+                global.triggerSystemLockdown(3 * 60 * 1000, `CPU/RAM Overload (CPU: ${cpuUsage}%)`);
             } else if (cpuUsage > 80 || ramUsagePercent > 80) {
                 ai.threatLevel = Math.max(ai.threatLevel, 4);
             }
@@ -92,21 +111,20 @@ if (!global.aiInterval) {
 
         // --- GARBAGE COLLECTOR / TUKANG SAPU RAM (Tiap 10 Menit) ---
         if (ai.ticks % 600 === 0 && global.connCache) {
-            let limitTime = now - 3600000; // Hapus data user yg AFK lebih dari 1 jam
+            let limitTime = now - 3600000; 
             ['lastCmdTime', 'warnMacet', 'userCd', 'spamData'].forEach(key => {
                 let obj = global.connCache[key];
                 if (obj) {
                     for (let jid in obj) {
                         let lastActive = (key === 'spamData') ? obj[jid].lastMsgTime : global.connCache.lastCmdTime[jid];
                         if (!lastActive || lastActive < limitTime) {
-                            delete obj[jid]; // 🧹 Bersihkan RAM!
+                            delete obj[jid]; 
                         }
                     }
                 }
             });
         }
 
-        // --- SELF-CHECK: KALO SPAM UDAH BERHENTI, LEPAS GEMBOK LEBIH CEPAT ---
         if (global.botBusyUntil > 0) {
             if (ai.currentRPM <= Math.max(AI_CONFIG.MIN_RPM, ai.avgRPM)) {
                  global.botBusyUntil = 0; 
@@ -129,7 +147,6 @@ if (!global.aiInterval) {
             }
         }
 
-        // --- LEARNING SYSTEM ---
         ai.avgRPS = (ai.currentRPS * AI_CONFIG.LEARN_RATE) + (ai.avgRPS * (1 - AI_CONFIG.LEARN_RATE));
         ai.currentRPS = 0; 
 
@@ -152,20 +169,19 @@ const handler = (m) => m;
 handler.before = async function all(m, { conn }) {
     if (!m.message || m.fromMe || !m.text) return;
     
-    // Save conn to global cache for the Garbage Collector
     global.connCache = conn; 
 
     // ==========================================
-    // 1. FILTERING COMMAND (FIX: LAZY DB QUERY)
+    // 1. FILTERING COMMAND (FIX 100% KEBAS CHAT BIASA)
     // ==========================================
-    // 🚀 Bot ngecek apakah ini Command atau Chat Biasa DULUAN sebelum nanya ke Database SQL!
     let isCommand = false;
-    const prefixRegex = global.prefix;
     let textStr = m.text.trim();
+    
+    // Pake prefix regex hardcode biar kuat ngeblokir chat nyasar
+    const prefixRegex = /^[xzXZ\/!#$%\+£¢€¥\^°=¶×÷π√✓©®:;?&.\-]/;
     let hasPrefix = prefixRegex.test(textStr);
     
     let cmdName = hasPrefix ? textStr.slice(1).split(/ +/).shift().toLowerCase() : textStr.split(/ +/).shift().toLowerCase();
-    let fullText = textStr.toLowerCase(); 
 
     if (global.plugins) {
         for (let name in global.plugins) {
@@ -174,22 +190,21 @@ handler.before = async function all(m, { conn }) {
 
             let cmds = plugin.command;
             if (Array.isArray(cmds)) {
-                if (cmds.some(cmd => cmd instanceof RegExp ? cmd.test(cmdName) || cmd.test(fullText) : cmd === cmdName)) {
-                    isCommand = true; break;
-                }
-            } else if (cmds instanceof RegExp) {
-                if (cmds.test(cmdName) || cmds.test(fullText)) {
+                if (cmds.some(cmd => typeof cmd === 'string' && cmd.toLowerCase() === cmdName)) {
                     isCommand = true; break;
                 }
             } else if (typeof cmds === 'string') {
-                if (cmds === cmdName) {
+                if (cmds.toLowerCase() === cmdName) {
+                    isCommand = true; break;
+                }
+            } else if (cmds instanceof RegExp) {
+                if (hasPrefix && cmds.test(textStr)) {
                     isCommand = true; break;
                 }
             }
         }
     }
 
-    // Kalau bukan command (cuma ngobrol biasa), langsung RETURN! Database SQL aman dari spam query.
     if (!isCommand) return;
     
     const txt = m.text.toLowerCase();
@@ -202,8 +217,6 @@ handler.before = async function all(m, { conn }) {
     
     let senderWa = m.sender.split('@')[0];
     const isOwner = global.owner.map(v => v.replace(/[^0-9]/g, '')).includes(senderWa);
-  //  const isMods = user.moderator || false;
-//    const isTS = user.timSupport || false;
     const isPremium = user.premium && (Number(user.premium) > Date.now());
     
     const isDewa = isOwner || isPremium;
@@ -216,7 +229,7 @@ handler.before = async function all(m, { conn }) {
         if (!global.hasSentBusyMessage[m.chat]) {
             let sisaMenit = Math.ceil((global.botBusyUntil - now) / 60000);
             conn.sendMessage(m.chat, {
-                text: `💤 *BOT MODE SIBUK (THREAT LEVEL ${global.brainAI.threatLevel})*\n\nServer menahan serangan spam. Bot sementara hanya merespon perintah *VIP (Owner, Staff, Premium)*.\n\n> Beli premium untuk akses prioritas. Ketik #buyprem`
+                text: `💤 *BOT MODE SIBUK (THREAT LEVEL ${global.brainAI.threatLevel})*\n\nServer menahan beban tinggi/rate limit. Bot sementara hanya merespon perintah *VIP (Owner, Staff, Premium)*.\n\n> Beli premium untuk akses prioritas. Ketik #buyprem`
             }, { quoted: m }).catch(() => { });
             global.hasSentBusyMessage[m.chat] = true;
         }
@@ -247,8 +260,8 @@ handler.before = async function all(m, { conn }) {
         ai.lastPurgeTime = now;
 
         let dynamicPurgeTime = Math.min(AI_CONFIG.BASE_PURGE_COOLDOWN * ai.purgeMultiplier, AI_CONFIG.MAX_PURGE_COOLDOWN);
-        global.botBusyUntil = now + dynamicPurgeTime;
-        global.hasSentBusyMessage = {};
+        // Gunakan fungsi global biar seragam
+        global.triggerSystemLockdown(dynamicPurgeTime, "Lonjakan Trafik / Serangan Spam");
 
         let topSpammer = null;
         let highestSpam = 0;

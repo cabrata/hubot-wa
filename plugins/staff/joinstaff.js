@@ -17,7 +17,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     // 🛡️ VERIFIKASI ISI DATA
     if (!nama || !umur) return m.reply('❌ Nama dan Umur wajib diisi!');
     if (isNaN(umur)) return m.reply('❌ Umur harus berupa angka!');
-
+    if (umur < 16) return m.reply('Minimal umur 16 tahun anjay, kick nih orang!!')
     // Masukkan ke "Ready To Take"
     staffData[m.sender] = {
         name: nama,

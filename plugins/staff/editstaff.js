@@ -50,9 +50,7 @@ let handler = async (m, { conn, command, text }) => {
     let senderStaffData = staffData[senderJid]
     
     // Syarat Moderator Management: Sender adalah Staff, rolenya Mod, dan Management-nya SAMA dgn target
-    let isModOfSameManagement = senderStaffData && 
-                                senderStaffData.role.toLowerCase().includes('mod') && 
-                                senderStaffData.management === targetData.management
+    let isModOfSameManagement = senderStaffData && (senderStaffData.role.toLowerCase().includes('mod') || senderStaffData.role.toLowerCase().includes('super')) && senderStaffData.management === targetData.management;
 
     // ==========================================
     // ⚙️ EKSEKUSI PERUBAHAN

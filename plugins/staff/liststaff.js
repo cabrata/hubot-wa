@@ -33,6 +33,11 @@ let handler = async (m) => {
         let s = staffData[jid];
         let manKey = s.management || 'Lainnya';
 
+        // 🔥 LOGIKA BARU: Kalo management-nya "-" atau kosong, langsung lempar ke Ready To Take
+        if (manKey.trim() === '-' || manKey.trim() === '') {
+            manKey = 'Ready To Take';
+        }
+
         if (!groups[manKey]) groups[manKey] = [];
 
         // Cek duplikat (kalau dia udah ada di Kasta Dewa, skip aja)
@@ -42,9 +47,8 @@ let handler = async (m) => {
             let bobot = 1; // Default: Support
             let currentRole = s.role.toLowerCase();
             if (currentRole.includes('mod')) bobot = 2;
-            if (currentRole.includes('super') || currentRole.includes('hrd')) bobot = 3; // Supervisor di atas Mod
+            if (currentRole.includes('super') || currentRole.includes('hrd')) bobot = 3; // Supervisor di atas MK
             if (manKey === 'Ready To Take' || currentRole.includes('trainee')) bobot = 0;
-
 
             groups[manKey].push({
                 jid: jid,
@@ -63,18 +67,27 @@ let handler = async (m) => {
     // Urutkan Management: Official Paling Atas, Ready To Take Paling Bawah
     let groupKeys = Object.keys(groups).sort((a, b) => {
         let aLow = a.toLowerCase(), bLow = b.toLowerCase();
+        
+        // Official prioritas utama (paling atas)
         if (aLow.includes('official') || aLow.includes('utama')) return -1;
         if (bLow.includes('official') || bLow.includes('utama')) return 1;
+        
+        // Ready To Take dibuang ke paling bawah
         if (a === 'Ready To Take') return 1;
         if (b === 'Ready To Take') return -1;
+        
         return a.localeCompare(b); // Sisanya sesuai abjad
     });
 
     for (let key of groupKeys) {
-        // Otomatis kasih imbuhan "Management" kalau belum ada (kecuali System / Ready To Take)
-        let title = key.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-        if (!title.toLowerCase().includes('management') && !title.toLowerCase().includes('system') && key !== 'Ready To Take') {
-            title += ' Management';
+        let title = key;
+
+        // 🔥 LOGIKA BARU: Jangan ubah nama atau nambahin kata "Management" buat Ready To Take
+        if (key !== 'Ready To Take' && key !== 'Lainnya') {
+            title = key.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            if (!title.toLowerCase().includes('management') && !title.toLowerCase().includes('system')) {
+                title += ' Management';
+            }
         }
 
         teks += `*${title}*\n`;
@@ -89,12 +102,12 @@ let handler = async (m) => {
             // Format List Utama Tanpa Bot Number
             teks += `• wa.me/${numberText} *${s.name}* (${s.role})\n`;
         });
-        teks += `\n`;
+        teks += `\n`; // Spasi antar grup
     }
 
     teks += `| Nomor Staff bukan bot!\n| Staff number is not a bot!`;
 
-    m.reply(teks.trim());
+    return m.reply(teks.trim());
 }
 
 handler.help = ['liststaff'];

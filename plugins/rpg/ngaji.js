@@ -1,3 +1,4 @@
+//rpg/ngaji.js
 const { updateEconomy, updateUser, updateCooldown } = require('../../lib/database')
 
 let handler = async (m, { conn }) => {
@@ -21,18 +22,23 @@ let handler = async (m, { conn }) => {
 
         var hsl = `\n*—[ Hasil Ngaji ${name} ]—*\n➕💹 Uang jajan: ${rbrb4}\n➕✨ Exp: ${rbrb5}\n➕🤬 Dimarahin: -1\n`
 
+        // 🛡️ FIX: Konversi eksplisit pakai Number() buat semua angka dari database
+        let currentWarn = Number(user.warn || 0)
+        let currentExp = Number(user.exp || 0)
+        let currentMoney = Number(user.money || Number(user.economy?.money) || 0)
+
         // 1. Simpan permanen ke database
         await updateUser(m.sender, { 
-            warn: Math.max(0, (user.warn || 0) - 1),
-            exp: (user.exp || 0) + rbrb5 
+            warn: Math.max(0, currentWarn - 1),
+            exp: currentExp + rbrb5 
         })
-        await updateEconomy(m.sender, { money: (user.money || 0) + rbrb4 })
-        await updateCooldown(m.sender, { lastngaji: Date.now() })
+        await updateEconomy(m.sender, { money: currentMoney + rbrb4 })
+        await updateCooldown(m.sender, { lastngaji: BigInt(Date.now()) }) // Simpan lastngaji sebagai BigInt jika memang skemanya BigInt
 
-        // 2. Update cache m.user lokal
-        user.warn = Math.max(0, (user.warn || 0) - 1);
-        user.exp = (user.exp || 0) + rbrb5;
-        user.money = (user.money || 0) + rbrb4;
+        // 2. Update cache m.user lokal biar ngga usah narik dari DB lagi pas ngetik command lain
+        user.warn = Math.max(0, currentWarn - 1);
+        user.exp = currentExp + rbrb5;
+        user.money = currentMoney + rbrb4;
         user.lastngaji = Date.now();
 
         setTimeout(() => { conn.reply(m.chat, `${hsl}`, m) }, 27000) 

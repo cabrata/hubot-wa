@@ -5,12 +5,15 @@ let handler = async (m, { conn }) => {
     let user = await getUser(m.sender)
     if (!user) return
 
-    // Menggunakan kerja4 sesuai dengan skema JSON Job
+    // 🛡️ FIX: Konversi Number() buat variabel timer
     let kerja4 = Number(user.kerja4 || 0)
     let __timers = (Date.now() - kerja4)
     let _timers = (3600000 - __timers)
     let timers = clockString(_timers)
-    let name = conn.getName(m.sender)
+    
+    // 🛡️ FIX: Tambahin 'await' biar nggak muncul [object Promise]
+    let name = await conn.getName(m.sender) || m.pushName || 'Hitman'
+    
     let id = m.sender
     let kerja = 'Bunuh'
     
@@ -39,10 +42,17 @@ let handler = async (m, { conn }) => {
 ➕ ☑️ Misi Berhasil = +1
 `.trim()
 
+        // 🛡️ FIX: Konversi BigInt dari database jadi Number() sebelum hitung-hitungan
+        let currentMoney = Number(user.money || Number(user.economy?.money) || 0)
+        let currentExp = Number(user.exp || 0)
+        let currentWarn = Number(user.warn || 0)
+
         // Simpan langsung ke SQL
-        await updateEconomy(m.sender, { money: (user.money || 0) + rbrb4 })
-        await updateUser(m.sender, { exp: (user.exp || 0) + rbrb5, warn: (user.warn || 0) + 1 })
-        await updateJob(m.sender, { kerja4: Date.now() })
+        await updateEconomy(m.sender, { money: currentMoney + rbrb4 })
+        await updateUser(m.sender, { exp: currentExp + rbrb5, warn: currentWarn + 1 })
+        
+        // Simpan Date.now() sebagai BigInt
+        await updateJob(m.sender, { kerja4: BigInt(Date.now()) })
 
         conn.misi[id] = [
             kerja,

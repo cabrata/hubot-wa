@@ -13,8 +13,6 @@ const TOTAL_SAHAM_IPO = 50_000;
 const PORSI_PUBLIK = 0.30; 
 const FEE_BROKER = 0.0015; 
 const VOLATILITAS = 0.05; 
-const ARA_LIMIT = 1.35; 
-const ARB_LIMIT = 0.65; 
 
 function formatMoney(number) {
     return 'Rp ' + BigInt(Math.floor(number)).toLocaleString('id-ID');
@@ -76,28 +74,29 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     let userSql = await getUser(m.sender);
     if (!userSql) return m.reply("Data user tidak ditemukan di database.");
 
+    // (Anti-cheat statis sudah dihapus sesuai kesepakatan)
     let userMoney = Number(userSql.money) || Number(userSql.economy?.money) || 0;
     let userPorto = parseJSON(userSql.portofolio) || {};
-
     let bursa = await getBursa();
     let bursaUpdatedOps = {};
 
     let action = command.toLowerCase() === 'listsaham' ? 'list' : (args[0] ? args[0].toLowerCase() : 'info');
 
     // =================================================================
-    // 🗞️ SISTEM EVENT PASAR REALISTIS & NPC TRADER
+    // 🗞️ SISTEM EVENT & NPC TRADER (DIBIKIN LEBIH REALISTIS & LAMBAT)
     // =================================================================
     const ptKeys = Object.keys(bursa);
     if (ptKeys.length > 0 && action !== 'buat') {
         
-        if (Math.random() < 0.10) { 
+        // Peluang berita muncul dikecilin jadi 3% biar ga nyepam
+        if (Math.random() < 0.03) { 
             let ptId = ptKeys[Math.floor(Math.random() * ptKeys.length)];
             let ptHoki = bursa[ptId];
             let marketEvents = [
-                { tipe: 'good', nama: "Laporan Keuangan Kuartal Memuaskan", danaMin: 100000000, danaMax: 500000000, efek: 1.10 }, 
-                { tipe: 'good', nama: "Memenangkan Tender Proyek Pemerintah", danaMin: 500000000, danaMax: 1000000000, efek: 1.15 }, 
-                { tipe: 'bad', nama: "Skandal Korupsi Jajaran Direksi", danaMin: -500000000, danaMax: -100000000, efek: 0.80 }, 
-                { tipe: 'bad', nama: "Pabrik / Kantor Cabang Terbakar", danaMin: -300000000, danaMax: -50000000, efek: 0.85 } 
+                { tipe: 'good', nama: "Laporan Keuangan Kuartal Memuaskan", danaMin: 100000000, danaMax: 500000000, efek: 1.05 }, // Naik max 5%
+                { tipe: 'good', nama: "Memenangkan Tender Proyek Pemerintah", danaMin: 500000000, danaMax: 1000000000, efek: 1.08 }, // Naik max 8%
+                { tipe: 'bad', nama: "Skandal Korupsi Jajaran Direksi", danaMin: -500000000, danaMax: -100000000, efek: 0.90 }, // Turun 10%
+                { tipe: 'bad', nama: "Pabrik / Kantor Cabang Terbakar", danaMin: -300000000, danaMax: -50000000, efek: 0.95 } // Turun 5%
             ];
             
             let ev = marketEvents[Math.floor(Math.random() * marketEvents.length)];
@@ -117,20 +116,25 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
             setTimeout(() => conn.reply(m.chat, berita, null), 1000); 
         }
 
-        let jumlahNPC = Math.floor(Math.random() * 3) + 1; 
+        // NPC Trader volumenya dikecilin biar harga ga goyang parah
+        let jumlahNPC = Math.floor(Math.random() * 2); 
         for (let i = 0; i < jumlahNPC; i++) {
             let ptId = ptKeys[Math.floor(Math.random() * ptKeys.length)];
             let ptTarget = bursa[ptId];
             let isNPCBuying = Math.random() > 0.5; 
-            let volumeNPC = Math.floor(Math.random() * 3000) + 100; 
+            let volumeNPC = Math.floor(Math.random() * 500) + 10; 
             
+            // 🛡️ FIX RUMUS: Dampak NPC dibatasi maksimal 0.5%
+            let rasioNPC = volumeNPC / (ptTarget.sharesAvailable || 1);
+            let impactNPC = Math.min(0.005, rasioNPC * VOLATILITAS); 
+
             if (isNPCBuying && ptTarget.sharesAvailable >= volumeNPC) {
                 ptTarget.sharesAvailable -= volumeNPC; 
-                ptTarget.price = Math.floor(ptTarget.price * Math.min(ARA_LIMIT, 1 + (VOLATILITAS * (volumeNPC / 1000))));
+                ptTarget.price = Math.floor(ptTarget.price * (1 + impactNPC));
                 bursaUpdatedOps[ptId] = true;
             } else if (!isNPCBuying) {
                 ptTarget.sharesAvailable += volumeNPC; 
-                ptTarget.price = Math.max(50, Math.floor(ptTarget.price * Math.max(ARB_LIMIT, 1 - (VOLATILITAS * (volumeNPC / 1000))))); 
+                ptTarget.price = Math.max(50, Math.floor(ptTarget.price * (1 - impactNPC))); 
                 bursaUpdatedOps[ptId] = true;
             }
         }
@@ -180,43 +184,40 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
         const subAction = args[1] ? args[1].toLowerCase() : '';
 
-        if (subAction === 'tarik') {
-            const amount = parseInt(args[2]);
-            if (isNaN(amount) || amount < 1) return m.reply(`❓ Contoh: *${usedPrefix}saham pt tarik 50000*`);
-            if (myPT.funds < amount) return m.reply(`❌ Kas PT tidak cukup!`);
+        if (subAction === 'tarik' || subAction === 'setor' || subAction === 'terbit') {
+            const amount = Number(args[2]);
+            if (isNaN(amount) || !Number.isSafeInteger(amount) || amount < 1) return m.reply(`❌ Jumlah yang dimasukkan tidak valid!`);
+            if (amount > 1_000_000_000_000) return m.reply(`🚫 Transaksi ditolak OJK! Batas maksimal adalah Rp 1 Triliun.`);
 
-            const minKas = BIAYA_IPO * 0.1; 
-            if ((myPT.funds - amount) < minKas) return m.reply(`❌ OJK Menolak!\nSisa kas minimal adalah *${formatMoney(minKas)}*`);
+            if (subAction === 'tarik') {
+                if (myPT.funds < amount) return m.reply(`❌ Kas PT tidak cukup!`);
+                const minKas = BIAYA_IPO * 0.1; 
+                if ((myPT.funds - amount) < minKas) return m.reply(`❌ OJK Menolak!\nSisa kas minimal adalah *${formatMoney(minKas)}*`);
 
-            myPT.funds -= amount;
-            await updateUser(m.sender, { money: userMoney + amount });
-            await updateBursaDB(m.sender, myPT);
-            return m.reply(`✅ Menarik *${formatLargeNumber(amount)}* dari kas PT ke dompetmu!`);
-        }
-        else if (subAction === 'setor') {
-            const amount = parseInt(args[2]);
-            if (isNaN(amount) || amount < 1) return m.reply(`❓ Contoh: *${usedPrefix}saham pt setor 50000*`);
-            if (userMoney < amount) return m.reply(`❌ Uang pribadimu tidak cukup!`);
+                myPT.funds -= amount;
+                await updateUser(m.sender, { money: userMoney + amount });
+                await updateBursaDB(m.sender, myPT);
+                return m.reply(`✅ Menarik *${formatLargeNumber(amount)}* dari kas PT ke dompetmu!`);
+            }
+            else if (subAction === 'setor') {
+                if (userMoney < amount) return m.reply(`❌ Uang pribadimu tidak cukup!`);
+                myPT.funds += amount;
+                await updateUser(m.sender, { money: userMoney - amount });
+                await updateBursaDB(m.sender, myPT);
+                return m.reply(`✅ Menyetor *${formatLargeNumber(amount)}* ke kas PT!`);
+            }
+            else if (subAction === 'terbit') {
+                const oldTotalShares = myPT.totalShares;
+                const oldPrice = myPT.price;
+                const newTotalShares = oldTotalShares + amount;
+                
+                myPT.price = Math.max(50, Math.floor((oldTotalShares / newTotalShares) * oldPrice));
+                myPT.totalShares += amount;
+                myPT.sharesAvailable += amount;
 
-            myPT.funds += amount;
-            await updateUser(m.sender, { money: userMoney - amount });
-            await updateBursaDB(m.sender, myPT);
-            return m.reply(`✅ Menyetor *${formatLargeNumber(amount)}* ke kas PT!`);
-        }
-        else if (subAction === 'terbit') {
-            const amount = parseInt(args[2]);
-            if (isNaN(amount) || amount < 1) return m.reply(`❓ Contoh: *${usedPrefix}saham pt terbit 10000*`);
-            
-            const oldTotalShares = myPT.totalShares;
-            const oldPrice = myPT.price;
-
-            const newTotalShares = oldTotalShares + amount;
-            myPT.price = Math.max(50, Math.floor((oldTotalShares / newTotalShares) * oldPrice));
-            myPT.totalShares += amount;
-            myPT.sharesAvailable += amount;
-
-            await updateBursaDB(m.sender, myPT);
-            return m.reply(`📄 *RIGHT ISSUE BERHASIL*\nBerhasil mencetak saham baru.\n⚠️ *DILUSI:* Harga sahammu turun jadi *${formatMoney(myPT.price)}*/lbr!`);
+                await updateBursaDB(m.sender, myPT);
+                return m.reply(`📄 *RIGHT ISSUE BERHASIL*\nBerhasil mencetak saham baru.\n⚠️ *DILUSI:* Harga sahammu turun jadi *${formatMoney(myPT.price)}*/lbr!`);
+            }
         }
 
         let mcap = myPT.price * myPT.totalShares;
@@ -226,19 +227,27 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     else if (action === 'beli') {
         const ticker = (args[1] || '').toUpperCase();
-        const amount = parseInt(args[2]);
-        if (!ticker || isNaN(amount) || amount < 1) return m.reply(`❓ Format: *${usedPrefix}saham beli <KODE> <Jumlah>*`);
+        let amountRaw = args[2]?.toLowerCase();
+        let amount = Number(amountRaw);
+        
+        if (!ticker) return m.reply(`❓ Format: *${usedPrefix}saham beli <KODE> <Jumlah>*`);
+        if (isNaN(amount) || !Number.isSafeInteger(amount) || amount < 1) return m.reply(`❌ Jumlah lembar saham tidak valid!`);
+        if (amount > 10_000_000) return m.reply(`🚫 OJK Menolak! Batas pembelian maksimal adalah 10 Juta lembar.`);
 
         const ptTarget = cariPT(bursa, ticker);
         if (!ptTarget) return m.reply(`❌ Kode saham tidak ditemukan.`);
         if (ptTarget.ownerId === m.sender) return m.reply(`❌ Tidak bisa membeli saham perusahaan sendiri di pasar sekunder!`);
 
         const ptData = ptTarget.data;
-        if (ptData.sharesAvailable < amount) return m.reply(`📉 Suplai tidak cukup!`);
+        if (ptData.sharesAvailable < amount) return m.reply(`📉 Suplai tidak cukup! Beredar: ${ptData.sharesAvailable.toLocaleString()} lbr.`);
 
-        let newPrice = Math.floor(ptData.price * Math.min(ARA_LIMIT, 1 + (VOLATILITAS * (amount / 1000))));
+        // 🛡️ FIX RUMUS HARGA: Beli banyak nggak akan bikin harga meroket gak ngotak
+        // Harga maksimal naik cuma 1.5% per transaksi (Mencegah Pump & Dump)
+        let rasioBeli = amount / ptData.sharesAvailable;
+        let impact = Math.min(0.015, rasioBeli * VOLATILITAS); 
+        let newPrice = Math.floor(ptData.price * (1 + impact));
+        
         let avgExecutionPrice = Math.floor((ptData.price + newPrice) / 2); 
-
         const subtotal = avgExecutionPrice * amount;
         const fee = Math.floor(subtotal * FEE_BROKER);
         const totalCost = subtotal + fee; 
@@ -257,19 +266,28 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     else if (action === 'jual') {
         const ticker = (args[1] || '').toUpperCase();
-        let amount = (args[2] || '').toLowerCase() === 'all' ? 'all' : parseInt(args[2]);
-        
+        let amountRaw = (args[2] || '').toLowerCase();
         const ptTarget = cariPT(bursa, ticker);
         if (!ptTarget) return m.reply(`❌ Kode saham tidak ditemukan.`);
 
         const ownedShares = userPorto[ptTarget.ownerId] || 0;
-        if (amount === 'all') amount = ownedShares;
-        if (isNaN(amount) || amount < 1 || ownedShares < amount) return m.reply(`📦 Saham tidak cukup.`);
+        let amount = 0;
+        if (amountRaw === 'all') {
+            amount = ownedShares;
+        } else {
+            amount = Number(amountRaw);
+        }
+
+        if (isNaN(amount) || !Number.isSafeInteger(amount) || amount < 1 || ownedShares < amount) return m.reply(`📦 Jumlah tidak valid atau sahammu kurang.`);
 
         const ptData = ptTarget.data;
-        let newPrice = Math.max(50, Math.floor(ptData.price * Math.max(ARB_LIMIT, 1 - (VOLATILITAS * (amount / 1000))))); 
+        
+        // 🛡️ FIX RUMUS HARGA: Jual banyak harga turun realistis (Max drop 1.5%)
+        let rasioJual = amount / ptData.totalShares;
+        let impactJual = Math.min(0.015, rasioJual * VOLATILITAS);
+        let newPrice = Math.max(50, Math.floor(ptData.price * (1 - impactJual))); 
+        
         let avgExecutionPrice = Math.floor((ptData.price + newPrice) / 2); 
-
         const subtotal = avgExecutionPrice * amount;
         const fee = Math.floor(subtotal * FEE_BROKER);
         const totalRevenue = subtotal - fee; 

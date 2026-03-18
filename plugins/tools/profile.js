@@ -64,8 +64,9 @@ let handler = async (m, { conn, usedPrefix, text }) => {
     }
     
     let user = await getUser(who)
-    if (!user) throw '❌ Pengguna tidak terdaftar di dalam database.'
-
+    if (!user) throw '❌ Pengguna tidak terdaftar di dalam database.';
+    if (user.banned) return m.reply('🔒 Informasi dikunci, user banned');
+    if (!user.registered) return m.reply(`🔒 Informasi dikunci, user belum terdaftar!\nKetik ${usedPrefix}daftar Nama.Umur`);
     let pp = 'https://telegra.ph/file/168ed310d65b7cb3ef451.jpg'
     try {
         pp = await conn.profilePictureUrl(who, 'image')
@@ -191,9 +192,9 @@ let handler = async (m, { conn, usedPrefix, text }) => {
     
 
     // Data Ekonomi (Format angka dipastikan Number agar toLocaleString jalan)
-    let moneyDisp = Number(user.economy?.money || 0).toLocaleString('id-ID')
-    let bankDisp = Number(user.economy?.bank || 0).toLocaleString('id-ID')
-    let saldoDisp = Number(user.economy?.saldo || 0).toLocaleString('id-ID')
+    let moneyDisp = Number(user.money || 0).toLocaleString('id-ID')
+    let bankDisp = Number(user.bank || 0).toLocaleString('id-ID')
+    let saldoDisp = Number(user.saldo || 0).toLocaleString('id-ID')
     let expDisp = Number(user.exp || 0).toLocaleString('id-ID')
     let limitDisp = Number(user.limit || 0).toLocaleString('id-ID')
      

@@ -5,8 +5,9 @@ let handler = async (m, { args, usedPrefix }) => {
     let user = await getUser(m.sender)
     if (!user) return
 
-    let currentHealth = user.health || 0
-    let currentPotion = user.potion || 0
+    // 🛡️ FIX: Bungkus pakai Number() biar BigInt dari database berubah jadi angka normal
+    let currentHealth = Number(user.health || 0)
+    let currentPotion = Number(user.potion || 0)
     const maxHealth = 100
     const healAmount = 50
 

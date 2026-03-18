@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
   RICH_THRESHOLD: 100_000_000,
   POOR_THRESHOLD: 100_000,
   PERCENTAGE_LIMIT_THRESHOLD: 10_000_000,
-  LUCK_BONUS: 0.0,
+  LUCK_BONUS: 0.1,
 };
 
 const SPECIAL_GROUP_CONFIG = {
@@ -22,7 +22,7 @@ const SPECIAL_GROUP_CONFIG = {
   RICH_THRESHOLD: 500_000_000,
   POOR_THRESHOLD: 1_000_000,
   PERCENTAGE_LIMIT_THRESHOLD: 50_000_000,
-  LUCK_BONUS: 0.2,
+  LUCK_BONUS: 0.3,
 };
 
 const SIMULATE = false;
@@ -236,5 +236,6 @@ handler.help = ['slot <jumlah taruhan|allin>'];
 handler.tags = ['game'];
 handler.command = /^(slot|slots)$/i;
 handler.group = true;
+//handler.rowner = true;
 
 module.exports = handler;

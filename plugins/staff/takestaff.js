@@ -9,11 +9,17 @@ let handler = async (m, { conn, text, usedPrefix }) => {
 
     let targetJid = nomor.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
     
-    let staffData = getStaff();
-    let ownerData = getOwnerDB();
+    // 🔥 FIX 1: Jangan lupa dikasih await bang
+    let staffData = await getStaff();
+    let ownerData = await getOwnerDB();
 
     if (!staffData[targetJid]) return m.reply('❌ Anak ini belum mendaftar pakai .joinstaff!');
-    if (staffData[targetJid].management !== 'Ready To Take') return m.reply(`⚠️ Anak ini sudah menjadi milik *${staffData[targetJid].management}*!`);
+    
+    // 🔥 FIX 2: Benerin jebakan logika OR (||) jadi AND (&&)
+    let targetMan = staffData[targetJid].management ? staffData[targetJid].management.trim() : '-';
+    if (targetMan !== '-' && targetMan !== '' && targetMan !== 'Ready To Take') {
+        return m.reply(`⚠️ Anak ini sudah menjadi milik *${staffData[targetJid].management}*!`);
+    }
 
    // ==========================================
     // 🕵️ LOGIKA HYBRID CHECK (Owner + Mod)
@@ -22,15 +28,17 @@ let handler = async (m, { conn, text, usedPrefix }) => {
     let senderWa = m.sender;
 
     // A. Cek apakah pengirim adalah Owner/Admin (Database VIP)
-    for (let key in ownerData) {
-        if (ownerData[key].owner === senderWa || (ownerData[key].staff && ownerData[key].staff.includes(senderWa))) {
-            myManagement = key;
-            break;
+    if (ownerData) {
+        for (let key in ownerData) {
+            // Kita cek apakah JID sender ada di array staff botOwnership
+            if (ownerData[key].staff && ownerData[key].staff.includes(senderWa)) {
+                myManagement = ownerData[key].owner; // Ambil nama management aslinya
+                break;
+            }
         }
     }
 
     // B. Cek apakah pengirim adalah Moderator/Supervisor (Database Staff)
-  
     if (!myManagement && staffData[senderWa]) {
         let s = staffData[senderWa];
         let role = (s.role || '').toLowerCase();
@@ -43,7 +51,7 @@ let handler = async (m, { conn, text, usedPrefix }) => {
         }
     }
 
-    if (!myManagement || myManagement === 'Ready To Take') {
+    if (!myManagement || myManagement === 'Ready To Take' || myManagement === '-') {
         return m.reply('❌ Kamu bukan bagian dari Management manapun! Kamu tidak berhak merekrut staff.');
     }
 
@@ -52,7 +60,7 @@ let handler = async (m, { conn, text, usedPrefix }) => {
     // Pindahkan Staff di JSON
     staffData[targetJid].management = myManagement;
     staffData[targetJid].role = finalRole;
-    saveStaff(staffData);
+    await saveStaff(staffData); // 🔥 FIX 3: Tambahin await pas nge-save
 
     // Berikan pangkat mutlak di SQL
     await db.user.update({
@@ -60,7 +68,7 @@ let handler = async (m, { conn, text, usedPrefix }) => {
         data: finalRole === 'Moderator' ? { moderator: true, timSupport: true } : { timSupport: true, moderator: false }
     }).catch(() => {});
 
-    m.reply(`🤝 *REKRUTMEN BERHASIL*\n\nStaff *${staffData[targetJid].name}* resmi ditarik dari bursa dan bergabung dengan *${myManagement.toUpperCase()}* sebagai *${finalRole}*.`);
+    m.reply(`🤝 *REKRUTMEN BERHASIL*\n\nStaff *${staffData[targetJid].name}* resmi ditarik dari bursa dan bergabung dengan *${myManagement}* sebagai *${finalRole}*.`);
 }
 
 handler.command = /^takestaff$/i;

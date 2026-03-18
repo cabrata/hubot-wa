@@ -32,13 +32,18 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
 
             try {
                 m.reply(wait);
+                const char = new Characters();
+                let data
+                if (!isNaN(query)) {
+                  data = await char.getCharacterFullById(query);
+                    } else {
                 var search = await malScraper.getResultsFromSearch(query, 'character');
                 const hasil = search[0];
                 if (!hasil) return m.reply('Character not found.');
 
-                const char = new Characters();
-                const data = await char.getCharacterFullById(hasil.id);
                 
+                data = await char.getCharacterFullById(hasil.id);
+                }
                 let animeData = data.anime && data.anime.length > 0 ? data.anime[0] : null;
                 
                 let nik = data.nicknames.map(nick => nick);

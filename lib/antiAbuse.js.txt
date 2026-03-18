@@ -1,60 +1,56 @@
 const { GoogleGenAI } = require('@google/genai')
 const { db } = require('./database')
 
-// 🛡️ DAFTAR FITUR YANG DIKECUALIKAN DARI RADAR (Bebas Profit Triliunan)
-const EXCLUDED_PLUGINS = ['judi', 'judi2', 'slot', 'slot2', 'casino', 'judipvp', 'redeem', 'reg', 'daftar', 'daget', 'giftaway'];
-
 // ==========================================
 // 🧠 MEMORY TRACKER (CCTV SPAM PER MENIT)
 // ==========================================
+// Bentuk data: { '628xxx@s...': { 'invest': [{ profit: 1000, time: 1678... }, ...] } }
 const tracker = {}; 
 
 // ⚙️ PENGATURAN RADAR ANTI-CHEAT
-const TIME_WINDOW = 60 * 1000; 
-const MAX_PROFIT_PER_MIN = 200_000_000_000_000; // Maks 2 Triliun per menit (Di luar judi)
-const MAX_SPAM_PROFIT_CMD = 15; // Maks 15 spam cmd berprofit per menit
+const TIME_WINDOW = 60 * 1000; // Jendela pantauan: 1 Menit (60.000 ms)
+const MAX_PROFIT_PER_MIN = 2_000_000_000_000; // Maksimal dapet 2 t PER MENIT dari 1 fitur
+const MAX_SPAM_PROFIT_CMD = 15; // Maksimal spam fitur yang ngasilin duit 30x PER MENIT
 
 async function generateAIWarning(name, profit, spamCount, command) {
     try {
         const ai = new GoogleGenAI({ apiKey: 'AIzaSyARBHX28ScN0SPPm5m8bLpaSbUw2RCg5yo' }); 
         
         let prompt = `Kamu adalah AI Keamanan "HuTao". 
-        Player bernama *${name}* ketahuan mengeksploitasi bug pada command '${command}' sebanyak ${spamCount} kali.
-        Uangnya bertambah Rp ${profit.toLocaleString('id-ID')} secara instan.
+        Player bernama *${name}* ketahuan mengeksploitasi bug. Dalam 1 menit terakhir, dia melakukan spam command '${command}' sebanyak ${spamCount} kali dan mendapatkan uang tidak wajar sebesar Rp ${profit.toLocaleString('id-ID')} secara instan.
         
-        Tugasmu: Buat pesan untuk menghukumnya. Beritahu dia hartanya telah direset jadi Rp 0. Gunakan nada dingin, kejam, dan sarkastik maksimal 3 kalimat.`;
+        Tugasmu: Buat pesan eksekusi hukuman. Beritahu dia bahwa perilakunya tidak wajar dan sistem telah menghanguskan seluruh uangnya menjadi Rp 0. Gunakan nada dingin, kejam, dan menyindir. Tanpa basa-basi, maksimal 3 kalimat.`;
 
         const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
         return response.text;
     } catch (e) {
-        // Teks fallback kalau AI lagi error/limit
         return `🚨 *ANOMALY DETECTED* 🚨\n\nSelamat ${name}, sistem mendeteksi lonjakan uang aneh dari command ${command}. Seluruh hartamu telah dibakar menjadi debu oleh sistem.`;
     }
 }
 
 async function checkAnomaly(conn, m, jid, oldMoney, newMoney, pluginName) {
-    // 1. CEK WHITELIST: Kalau ini fitur judi/redeem, biarin aja!
-    if (pluginName && EXCLUDED_PLUGINS.some(cmd => pluginName.toLowerCase().includes(cmd))) {
-        return false; 
-    }
-
-    // 2. BYPASS KHUSUS OWNER
+    // 🛡️ BYPASS KHUSUS OWNER: Lu bebas dari radar!
     let isOwner = global.owner && global.owner.map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(jid);
     if (isOwner) return false;
 
     let profit = newMoney - oldMoney;
     
-    // Kalau nggak dapet untung, skip
+    // Kalau dia nggak dapet untung (atau malah rugi), aman, gak usah di-track
     if (profit <= 0 && newMoney !== Infinity && !isNaN(newMoney)) return false; 
 
     const now = Date.now();
 
+    // 1. Inisialisasi Tracker buat user & command ini
     if (!tracker[jid]) tracker[jid] = {};
     if (!tracker[jid][pluginName]) tracker[jid][pluginName] = [];
 
+    // 2. Masukkan riwayat profit baru ke dalam memori
     tracker[jid][pluginName].push({ profit: profit, time: now });
+
+    // 3. Bersihkan memori yang lebih tua dari 1 menit (Biar gak menuh-menuhin RAM)
     tracker[jid][pluginName] = tracker[jid][pluginName].filter(log => now - log.time <= TIME_WINDOW);
 
+    // 4. Kalkulasi Dosa dalam 1 menit terakhir
     let totalProfitInOneMinute = 0;
     let spamCountInOneMinute = tracker[jid][pluginName].length;
 
@@ -62,40 +58,36 @@ async function checkAnomaly(conn, m, jid, oldMoney, newMoney, pluginName) {
         totalProfitInOneMinute += log.profit;
     }
 
-    // 🚨 VONIS HAKIM
+    // 🚨 5. VONIS HAKIM (Cek Anomali Kecepatan & Spam)
     let isBugAbuser = false;
 
-    if (isNaN(newMoney) || newMoney === Infinity) isBugAbuser = true; 
-    if (totalProfitInOneMinute > MAX_PROFIT_PER_MIN) isBugAbuser = true; 
-    if (spamCountInOneMinute > MAX_SPAM_PROFIT_CMD && totalProfitInOneMinute > 1_000_000_000_000) isBugAbuser = true; 
+    if (isNaN(newMoney) || newMoney === Infinity) isBugAbuser = true; // Fix manipulasi angka
+    if (totalProfitInOneMinute > MAX_PROFIT_PER_MIN) isBugAbuser = true; // Duit gak ngotak per menit
+    if (spamCountInOneMinute > MAX_SPAM_PROFIT_CMD && totalProfitInOneMinute > 100_000_000) isBugAbuser = true; // Pake auto-clicker/spam bot
 
     if (isBugAbuser) {
-        // 🛡️ FIX [object Promise]: Tarik nama pakai await, plus fallback pushName biar selalu ada nama
-        let userName = m.pushName || 'Player';
-        try {
-            let fetchedName = await conn.getName(jid);
-            if (typeof fetchedName === 'string') userName = fetchedName;
-        } catch (e) {}
-
+        let userName = conn.getName(jid) || 'Player';
         let aiMessage = await generateAIWarning(userName, totalProfitInOneMinute, spamCountInOneMinute, pluginName);
 
-        // ☠️ EKSEKUSI MATI
+        // ☠️ EKSEKUSI MATI: Bikin miskin 100%
         await db.user.update({
             where: { jid: jid },
             data: { money: 0, bank: 0 } 
         }).catch(() => {});
 
+        // Bersihkan log dia (Biar gak ke-trigger dobel)
         tracker[jid][pluginName] = []; 
 
+        // 📢 PERMALUKAN DI GRUP
         await conn.sendMessage(m.chat, { 
             text: `🤖 *[ AI OVERWATCH SYSTEM ]* 🤖\n\n${aiMessage}`,
             mentions: [jid]
         }, { quoted: m });
 
-        return true; 
+        return true; // Tangkap basah!
     }
 
-    return false; 
+    return false; // Aman
 }
 
 module.exports = { checkAnomaly }

@@ -7,7 +7,7 @@ global.botVersion = '1.0.0'
 global.author = '@caliphdev'
 
 // Owner numbers (without @s.whatsapp.net)
-global.owner = ['6281533331660', '6281268880344', '6282153017890']   // ganti dengan nomor owner
+global.owner = ['6281533331660', '6281268880344', '6282153017890', '628112727588']   // ganti dengan nomor owner
 global.nabil = ['6282153017890', '6287787293078', '6281910091919']
 
 // Prefix
