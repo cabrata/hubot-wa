@@ -16,6 +16,7 @@
         jidDecode,
         getContentType,
         downloadContentFromMessage,
+        proto
     } = await import('wbssocket')
 
     const NodeCache = require('node-cache')
@@ -108,6 +109,32 @@
         }
 
         conn.edit = (chatId, text, key) => conn.sendMessage(chatId, { edit: key.key, text });
+
+        conn.cMod = (jid, copy, text = '', sender = conn.user.id, options = {}) => {
+            let mcopy = JSON.parse(JSON.stringify(copy))
+            let mtype = Object.keys(mcopy.message)[0]
+            let isEphemeral = mtype === 'ephemeralMessage'
+            if (isEphemeral) {
+                mtype = Object.keys(mcopy.message.ephemeralMessage.message)[0]
+            }
+            let msg = isEphemeral ? mcopy.message.ephemeralMessage.message : mcopy.message
+            let content = msg[mtype]
+            
+            if (typeof content === 'string') msg[mtype] = text || content
+            else if (content.caption) content.caption = text || content.caption
+            else if (content.text) content.text = text || content.text
+            
+            if (typeof content !== 'string') msg[mtype] = { ...content, ...options }
+            
+            if (mcopy.key.participant) sender = mcopy.key.participant = sender || mcopy.key.participant
+            if (mcopy.key.remoteJid.includes('@s.whatsapp.net')) sender = sender || mcopy.key.remoteJid
+            else if (mcopy.key.remoteJid.includes('@broadcast') || mcopy.key.remoteJid.includes('@status')) sender = sender || mcopy.key.remoteJid
+            
+            mcopy.key.remoteJid = jid
+            mcopy.key.fromMe = sender === conn.user.id
+
+            return proto.WebMessageInfo.fromObject(mcopy)
+        }
 
         conn.downloadMediaMessage = async (msg) => {
             const mtype = getContentType(msg.message)
