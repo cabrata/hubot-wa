@@ -69,10 +69,29 @@
             return name || id.split('@')[0]
         }
 
-        conn.groupMeta = async (jid) => {
-            try { return await conn.groupMetadata(jid) }
-            catch { return { participants: [] } }
+        if (!global.groupCache) {
+            const NodeCache = require('node-cache')
+            global.groupCache = new NodeCache({ stdTTL: 5 * 60, useClones: false })
         }
+
+        conn.groupMeta = async (jid) => {
+            if (global.groupCache.has(jid)) return global.groupCache.get(jid)
+            try { 
+                const metadata = await conn.groupMetadata(jid) 
+                global.groupCache.set(jid, metadata)
+                return metadata
+            } catch { return { participants: [] } }
+        }
+
+        // Auto-flush cache on group updates
+        conn.ev.on('group-participants.update', (update) => {
+            if (global.groupCache && update.id) global.groupCache.del(update.id)
+        })
+        conn.ev.on('groups.update', (updates) => {
+            for (const update of updates) {
+                if (global.groupCache && update.id) global.groupCache.del(update.id)
+            }
+        })
 
         conn.reply = async (jid, text, quoted, options = {}) => {
             return conn.sendMessage(jid, { text, ...options }, { quoted })
