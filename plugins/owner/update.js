@@ -6,6 +6,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 
     m.reply('Mengecek pembaruan dari repository (Git Pull)...');
     try {
+        let oldCommit = execSync('git rev-parse HEAD').toString().trim();
         let stdout = execSync('git pull origin master'); // Atur branch jika berbeda
         let result = stdout.toString();
         
@@ -13,7 +14,20 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
             return m.reply('✅ Bot sudah menggunakan versi terbaru dari repositori.');
         }
 
-        await m.reply(`✅ *Berhasil update script:*\n\n\`\`\`\n${result}\n\`\`\`\n\n🔄 *Restarting bot...*`);
+        let newCommit = execSync('git rev-parse HEAD').toString().trim();
+        let changelog = '';
+        
+        if (oldCommit !== newCommit) {
+            changelog = execSync(`git log ${oldCommit}..${newCommit} --oneline --format="- %s"`).toString().trim();
+        }
+
+        let replyMsg = `✅ *Berhasil update script:*\n\n`;
+        if (changelog) {
+            replyMsg += `📜 *Pembaruan (Commit Log):*\n${changelog}\n\n`;
+        }
+        replyMsg += `\`\`\`\n${result}\n\`\`\`\n\n🔄 *Restarting bot...*`;
+
+        await m.reply(replyMsg);
         setTimeout(() => {
             if (process.send) {
                 process.send('restart');
