@@ -38,7 +38,7 @@ module.exports = {
                 if (bcText.trim() === '📢 *BROADCAST*') bcText = '' // Empty if there's no text/caption
 
                 // footer
-                let footer = `\n\n> *${global.botName}*`
+                bcText += `\n\n> *${global.botName}*`
                 
                 // Synthesize the payload via cMod
                 let msg = conn.cMod(jid, c, bcText, conn.user.id)
