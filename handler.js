@@ -76,6 +76,25 @@ module.exports = {
             if ((!isTS || !isMods) && ((m.user && m.user.banned) || (m.chatData && m.chatData.isBanned))) return;
             if (typeof m.text !== 'string') m.text = ''
 
+            // ========== JADIBOT DUPLICATE PREVENTION ==========
+            // Prevent duplicate responses if both Main Bot and Jadibot are in the same group.
+            if (m.isGroup && global.conn?.user?.id && this.user?.id) {
+                const mainBotJid = this.decodeJid(global.conn.user.id);
+                const thisBotJid = this.decodeJid(this.user.id);
+                
+                if (mainBotJid !== thisBotJid) {
+                    const groupMeta = m.groupMetadata || {};
+                    const participants = groupMeta.participants || [];
+                    const isMainBotHere = participants.some(p => 
+                        (p.id && this.decodeJid(p.id) === mainBotJid) || 
+                        (p.id === mainBotJid)
+                    );
+                    if (isMainBotHere) {
+                        return; // Let the main bot handle this message
+                    }
+                }
+            }
+
 
             // ========== RUN PLUGIN before() HOOKS ==========
             for (const name in global.plugins) {

@@ -24,8 +24,9 @@ schedule.scheduleJob('*/2 * * * *', async () => {
         }
 
         if (data.DateTime !== lastGempa) {
-            // New earthquake detected
+            // New earthquake detected - SAVE IMMEDIATELY to prevent duplicate sends from overlapping crons
             console.log(`[AutoGempa] New earthquake detected at ${data.DateTime}`)
+            fs.writeFileSync(lastGempaFile, data.DateTime)
 
             // Get groups with warngempa enabled
             const subscribedChats = await db.chat.findMany({
@@ -51,21 +52,51 @@ schedule.scheduleJob('*/2 * * * *', async () => {
                 
                 for (let chat of subscribedChats) {
                     try {
-                        await global.conn.sendMessage(chat.chatId, {
-                            video: buffer,
-                            gifPlayback: true,
-                            caption: caption
-                        })
+                        let sent = false;
+
+                        // Try sending with the main bot first
+                        if (global.conn) {
+                            try {
+                                await global.conn.sendMessage(chat.chatId, {
+                                    video: buffer,
+                                    gifPlayback: true,
+                                    caption: caption
+                                });
+                                sent = true;
+                            } catch (e) {
+                                // If main bot is not in the group, we will try jadibots
+                            }
+                        }
+
+                        // If the main bot couldn't send (e.g., it's a Jadibot's group and main bot isn't inside)
+                        // Then fallback to finding a connection that can send it
+                        if (!sent && global.conns && global.conns.length > 0) {
+                            for (const subConn of global.conns) {
+                                try {
+                                    await subConn.sendMessage(chat.chatId, {
+                                        video: buffer,
+                                        gifPlayback: true,
+                                        caption: caption
+                                    });
+                                    sent = true;
+                                    break; // Stop after first successful send
+                                } catch (e) {
+                                    // Connection not in group, try the next one
+                                }
+                            }
+                        }
+
+                        if (!sent) {
+                            console.error(`[AutoGempa] Failed to send to ${chat.chatId}: No suitable connection found`);
+                        }
+
                         // Add some delay to prevent spam
                         await new Promise(resolve => setTimeout(resolve, 3000))
                     } catch (e) {
-                        console.error(`[AutoGempa] Failed to send to ${chat.chatId}`, e)
+                        console.error(`[AutoGempa] Error while processing chat ${chat.chatId}`, e)
                     }
                 }
             }
-
-            // Save last gempa after broadcasting
-            fs.writeFileSync(lastGempaFile, data.DateTime)
         }
     } catch (e) {
         console.error('[AutoGempa] Error fetching or processing BMKG data:', e)
