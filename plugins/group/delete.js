@@ -1,22 +1,18 @@
-let handler = async (m, { conn, isAdmin, isOwner }) => {
+let handler = async (m, { conn, isAdmin, isOwner, isBotAdmin }) => {
     // Memastikan ada balasan pesan
     if (!m.quoted) return m.reply('❌ Reply pesan yang ingin dihapus!')
 
     let isBotMessage = m.quoted.sender === conn.user.jid
 
     // Key identifikasi pesan
-    let key = {
-        remoteJid: m.chat,
-        fromMe: isBotMessage,
-        id: m.quoted.key.id,
-        participant: m.quoted.key.participant
-    }
+    let { key } = m.quoted
 
     // Jika pesan orang lain, pastikan user adalah Admin/Owner
     if (!isBotMessage) {
         if (!(isAdmin || isOwner)) {
             return m.reply('❌ Hanya Admin Grup atau Bot Owner yang bisa menghapus pesan orang lain!')
         }
+        if (!isBotAdmin) return m.reply('❌ Bot harus menjadi Admin untuk menghapus pesan orang lain!')
     }
 
     // Eksekusi penghapusan
