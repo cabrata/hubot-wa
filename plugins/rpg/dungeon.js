@@ -106,10 +106,10 @@ async function handler(m, { conn, usedPrefix, command, text }) {
           if (swordTool) {
             let newDura = (swordTool.durability || 50) - sword
             if (newDura < 1) {
-              await setTool(p, 'sword', null)
+              await setTool(p, 'sword', 0, 0)
               SDH.push(p)
             } else {
-              await setTool(p, 'sword', { durability: newDura })
+              await setTool(p, 'sword', swordTool.owned, newDura)
             }
           }
 
@@ -255,10 +255,10 @@ handler.before = async function (m) {
         if (swordTool) {
           let newDura = (swordTool.durability || 50) - sword
           if (newDura < 1) {
-            await setTool(p1, 'sword', null)
+            await setTool(p1, 'sword', 0, 0)
             swordBroken = true
           } else {
-            await setTool(p1, 'sword', { durability: newDura })
+            await setTool(p1, 'sword', swordTool.owned, newDura)
           }
         }
 
@@ -332,10 +332,10 @@ handler.before = async function (m) {
           if (swordTool) {
             let newDura = (swordTool.durability || 50) - sword
             if (newDura < 1) {
-              await setTool(p, 'sword', null)
+              await setTool(p, 'sword', 0, 0)
               SDH.push(p)
             } else {
-              await setTool(p, 'sword', { durability: newDura })
+              await setTool(p, 'sword', swordTool.owned, newDura)
             }
           }
 
