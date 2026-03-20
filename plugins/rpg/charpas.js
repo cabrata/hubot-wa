@@ -90,6 +90,43 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
             break;
         }
 
+        case 'cekpas': {
+            let query = text;
+            if (!query) return m.reply(`Format salah! Cara penggunaan:\n${usedPrefix + command} query\nContoh:\n${usedPrefix + command} Kano chinatsu`);
+
+            try {
+                m.reply(wait);
+                const char = new Characters();
+                let data
+                if (!isNaN(query)) {
+                  data = await char.getCharacterFullById(query);
+                } else {
+                    var search = await malScraper.getResultsFromSearch(query, 'character');
+                    const hasil = search[0];
+                    if (!hasil) return m.reply('Character not found.');
+                    data = await char.getCharacterFullById(hasil.id);
+                }
+                
+                let namaChar = data.name;
+                
+                let allUsers = await db.user.findMany({ where: { registered: true } });
+                let sudahDimiliki = allUsers.find(u => {
+                    let p = parseJSON(u.pasanganChar);
+                    return p && p.name === namaChar;
+                });
+                
+                if (sudahDimiliki) {
+                    m.reply(`💔 Yah karakter *${namaChar}* sudah memiliki pasangan.`);
+                } else {
+                    m.reply(`🤍 Karakter *${namaChar}* belum memiliki pasangan.\nKamu bisa melamarnya.`);
+                }
+            } catch (err) {
+                console.log(err);
+                return m.reply('Error saat mencari character\n' + err);
+            }
+            break;
+        }
+
         case 'pas': {
             let user = await getUser(m.sender)
             if (!user || !user.pasanganChar)
@@ -537,8 +574,8 @@ handler.before = async function (m, { conn }) {
     }
 };
 
-handler.help = [ 'characterpas', 'pas', 'setpas', 'approvepas', 'rejectpas', 'act'];
+handler.help = [ 'characterpas', 'pas', 'setpas', 'approvepas', 'rejectpas', 'act', 'cekpas'];
 handler.tags = ['rpg'];
-handler.command = /^(charpas|characterpas|pas|setpas|approvepas|rejectpas|act)$/i;
+handler.command = /^(charpas|characterpas|pas|setpas|approvepas|rejectpas|act|cekpas)$/i;
 handler.register = true;
 module.exports = handler;
