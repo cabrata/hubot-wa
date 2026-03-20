@@ -2,7 +2,7 @@ let handler = async (m, { conn, isAdmin, isOwner, isBotAdmin }) => {
     // Memastikan ada balasan pesan
     if (!m.quoted) return m.reply('❌ Reply pesan yang ingin dihapus!')
 
-    let isBotMessage = m.quoted.sender === conn.user.jid
+    let isBotMessage = m.quoted.key.fromMe;
 
     // Key identifikasi pesan
     let { key } = m.quoted
