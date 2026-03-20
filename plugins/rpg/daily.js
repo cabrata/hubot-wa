@@ -16,7 +16,7 @@ let handler = async (m, {conn, text, isPrems}) => {
 
     let reward = isPrems ? prem : free;
     
-    await updateUser(m.sender, { exp: user.exp + reward });
+    await updateUser(m.sender, { exp: Number(user.exp || 0) + reward });
     await updateCooldown(m.sender, { lastclaim: currentTime });
 
     m.reply(`

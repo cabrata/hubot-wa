@@ -20,8 +20,8 @@ let handler = async (m, { conn, isPrems }) => {
     let expGain = isPrems ? prem : free
     let moneyGain = isPrems ? moneyprem : moneyfree
 
-    await updateUser(m.sender, { exp: (user.exp || 0) + expGain })
-    await updateEconomy(m.sender, { money: (user.money || 0) + moneyGain })
+    await updateUser(m.sender, { exp: Number(user.exp || 0) + expGain })
+    await updateEconomy(m.sender, { money: Number(user.money || 0) + moneyGain })
     await updateCooldown(m.sender, { lasthourly: Date.now() })
 
     conn.reply(m.chat, `Selamat kamu mendapatkan:\n\n+${expGain} Exp\n+${moneyGain} Money`, m)

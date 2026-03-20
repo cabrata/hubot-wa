@@ -23,10 +23,12 @@ let handler = async (m, { conn, isPrems }) => {
     let moneyGain = isPrems ? moneyprem : moneyfree
     let limitGain = isPrems ? limitprem : limitfree
 
-    await updateUser(m.sender, { exp: (user.exp || 0) + expGain })
+    await updateUser(m.sender, { 
+        exp: Number(user.exp || 0) + expGain,
+        limit: Number(user.limit || 0) + limitGain
+    })
     await updateEconomy(m.sender, { 
-        money: (user.money || 0) + moneyGain,
-        limit: (user.limit || 0) + limitGain
+        money: Number(user.money || 0) + moneyGain
     })
     await updateCooldown(m.sender, { lastmonthly: Date.now() })
 
