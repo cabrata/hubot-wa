@@ -1,49 +1,37 @@
-const { updateChat, updateUser } = require('../../lib/database');
+const { updateChat } = require('../../lib/database');
 
-let handler = async (m, { conn, command, text, isOwner, isROwner }) => {
-    // Cek apakah yang pakai adalah Moderator atau Owner
-    let isMods = isROwner || isOwner || (m.user && m.user.moderator);
+let handler = async (m, { conn, command, isOwner, isAdmin }) => {
+    let isMods = isOwner || (m.user && m.user.moderator);
     
-    if (!isMods) {
-        return global.dfail('mods', m, conn);
+    if (!(isAdmin || isMods)) {
+        return global.dfail('admin', m, conn);
     }
 
-    let who;
-    if (m.isGroup) {
-        // Bisa tag orang, reply pesan, atau masukkan nomor. Kalau kosong = ban grupnya.
-        who = m.mentionedJid[0] ? m.mentionedJid[0] : m.quoted ? m.quoted.sender : text ? text.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : m.chat;
-    } else {
-        who = text ? text.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : m.chat;
+    if (!m.isGroup) {
+        return m.reply("❌ Fitur ini hanya bisa digunakan di dalam Grup!");
     }
+
+    let who = m.chat;
 
     try {
         if (command === 'banchat') {
-            if (who.endsWith('g.us')) {
-                await updateChat(who, { isBanned: true });
-                m.reply(`✅ Berhasil ban chat ini!\nBot tidur dan tidak akan merespon siapapun di grup ini.`);
-            } else {
-                await updateUser(who, { banned: true });
-                m.reply(`✅ Berhasil Banned user tersebut!\nDia tidak akan bisa menggunakan bot lagi.`);
-            }
+            await updateChat(who, { isBanned: true });
+            m.reply(`✅ Berhasil ban chat ini!\nBot tidur dan tidak akan merespon siapapun di grup ini.`);
         } 
         else if (command === 'unbanchat') {
-            if (who.endsWith('g.us')) {
-                await updateChat(who, { isBanned: false });
-                m.reply(`✅ Done Unbanchat!\nSekarang bot aktif dan bisa dipakai kembali di grup ini.`);
-            } else {
-                await updateUser(who, { banned: false });
-                m.reply(`✅ Done Unban user!\nPengguna tersebut sudah diampuni dan bisa memakai bot lagi.`);
-            }
+            await updateChat(who, { isBanned: false });
+            m.reply(`✅ Done Unbanchat!\nSekarang bot aktif dan bisa dipakai kembali di grup ini.`);
         }
     } catch (e) {
         console.error(e);
-        m.reply(`❌ Terjadi kesalahan SQL saat mencoba memproses database.\n${e.message}`);
+        m.reply(`❌ Terjadi kesalahan saat mencoba memproses database.\n${e.message}`);
     }
 }
 
 handler.help = ['banchat', 'unbanchat'];
-handler.tags = ['owner'];
+handler.tags = ['group'];
 handler.command = /^(banchat|unbanchat)$/i;
-handler.mods = true;
+handler.group = true;
+handler.admin = true;
 
 module.exports = handler;
