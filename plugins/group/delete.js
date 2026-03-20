@@ -8,8 +8,8 @@ let handler = async (m, { conn, isAdmin, isOwner }) => {
     let key = {
         remoteJid: m.chat,
         fromMe: isBotMessage,
-        id: m.quoted.id,
-        participant: m.quoted.sender
+        id: m.quoted.key.id,
+        participant: m.quoted.key.participant
     }
 
     // Jika pesan orang lain, pastikan user adalah Admin/Owner
