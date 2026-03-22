@@ -403,19 +403,28 @@ module.exports = {
 
         for (const jid in presences) {
             const presence = presences[jid]
+            let senderJid = jid
+
+            // If the chat is a group and the typing user is a LID, try to resolve it using group metadata
+            if (id.endsWith('@g.us') && jid.includes('@lid')) {
+                try {
+                    let groupMetadata = await this.groupMeta(id)
+                    let participant = groupMetadata.participants?.find((p) => p.id === jid || p.lid === jid)
+                    if (participant?.phoneNumber) senderJid = participant.phoneNumber
+                    else if (participant?.id && !participant.id.includes('@lid')) senderJid = participant.id
+                } catch (e) { }
+            }
+
+            // Tracker List Online (Per Group)
+            global.onlineList = global.onlineList || {}
+            let cGroup = id.endsWith('@g.us') ? id : 'global'
+            global.onlineList[cGroup] = global.onlineList[cGroup] || {}
+            global.onlineList[cGroup][senderJid] = {
+                time: Date.now(),
+                action: presence.lastKnownPresence
+            }
+
             if (presence.lastKnownPresence === 'composing' || presence.lastKnownPresence === 'recording') {
-                let senderJid = jid
-
-                // If the chat is a group and the typing user is a LID, try to resolve it using group metadata
-                if (id.endsWith('@g.us') && jid.includes('@lid')) {
-                    try {
-                        let groupMetadata = await this.groupMeta(id)
-                        let participant = groupMetadata.participants?.find((p) => p.id === jid || p.lid === jid)
-                        if (participant?.phoneNumber) senderJid = participant.phoneNumber
-                        else if (participant?.id && !participant.id.includes('@lid')) senderJid = participant.id
-                    } catch (e) { }
-                }
-
                 // Get user from DB
                 const user = await getUser(senderJid).catch(() => null)
                 if (user && user.afk > -1) {
