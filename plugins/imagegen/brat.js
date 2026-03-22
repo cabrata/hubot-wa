@@ -5,11 +5,11 @@ const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 const THEMES = ['green', 'white', 'black', 'blue', 'strike', 'red'];
 
 async function processBratPuppeteer(text, themeName) {
-    const executablePath = execSync('which chromium || which google-chrome || which chrome || which chromium-browser').toString().trim();
+    const executablePath = execSync('which chromium').toString().trim();
     const browser = await puppeteer.launch({
         executablePath,
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        args: ['--no-sandbox']
     });
 
     try {
