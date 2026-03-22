@@ -322,7 +322,7 @@ module.exports = {
                        await updateUser(m.sender, { 
                            lastUseTime: new Date(), 
                            lastUseCommand: (usedPrefix || '') + command 
-                       }).catch(() => console.error(e))
+                       }).catch((e) => console.error(e))
                     }
                 }
             } catch (e) { }
