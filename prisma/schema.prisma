@@ -107,6 +107,8 @@ model User {
 
   // ── Misc ──
   perkerjaandua  BigInt  @default(0)
+  lastUseTime    DateTime?
+  lastUseCommand String  @default("")
 
   // ── Relations ──
   economy    UserEconomy?

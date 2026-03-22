@@ -315,9 +315,15 @@ module.exports = {
                     }
                 }
 
-                // Command stats
-                if (m && m.plugin) {
+                // Command stats & Last Use Tracker
+                if (m && m.plugin && m.isCommand) {
                     await updateCommandStats(m.plugin, m.error != null).catch(() => { })
+                    if (!m.error) {
+                       await updateUser(m.sender, { 
+                           lastUseTime: new Date(), 
+                           lastUseCommand: (usedPrefix || '') + command 
+                       }).catch(() => { })
+                    }
                 }
             } catch (e) { }
 
