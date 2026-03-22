@@ -57,7 +57,7 @@ module.exports = {
     owner: false,
     premium: false,
     private: false,
-    limit: 1,
+    limit: false,
     tags: ['tools'],
     desc: 'Buat stiker generator Brat dengan berbagai tema via Puppeteer',
 
