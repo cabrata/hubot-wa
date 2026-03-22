@@ -180,6 +180,8 @@ module.exports = {
                     if (!isAccept) continue
 
                     m.plugin = name
+                    m.usedPrefix = usedPrefix
+                    m.command = command
 
                     // ========== PERMISSION & BAN CHECKS ==========
                     const chatData = m.chatData || {}
@@ -321,7 +323,7 @@ module.exports = {
                     if (!m.error) {
                        await updateUser(m.sender, { 
                            lastUseTime: new Date(), 
-                           lastUseCommand: (usedPrefix || '') + command 
+                           lastUseCommand: (m.usedPrefix || '') + (m.command || '')
                        }).catch((e) => console.error(e))
                     }
                 }
