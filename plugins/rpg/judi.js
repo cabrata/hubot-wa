@@ -20,8 +20,8 @@ function getDynamicRolls(netWinLoss) {
         playerMax = 80;
     } else {
         // Normal (Bandar punya sedikit keunggulan layaknya kasino asli)
-        botMax = 105;
-        playerMax = 100;
+        botMax = 125;
+        playerMax = 70;
     }
     
     return { botMax, playerMax };
@@ -50,14 +50,25 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
             return m.reply(`⏳ Bandar sedang istirahat. Tunggu *${timeLeft} detik* lagi.`);
         }
 
-        let currentMoney = user.money || 0;
+                let currentMoney = user.money || 0;
         let count = args[0];
+        
+        // 🛡️ BIKIN LIMIT: Maksimal 1 Miliar
+        const ABSOLUTE_MAX_BET = 1000000000;
 
         if (!count) return m.reply(`❓ Format salah!\nContoh: *${usedPrefix + command} 5000* atau *${usedPrefix + command} all*`);
 
-        count = count.toLowerCase() === 'all' ? currentMoney : parseInt(count);
-        if (isNaN(count) || count <= 0) return m.reply('❌ Jumlah taruhan tidak valid!');
+        if (count.toLowerCase() === 'all') {
+            count = Math.min(currentMoney, ABSOLUTE_MAX_BET);
+        } else {
+            count = parseInt(count);
+        }
+
+        // 🛡️ ANTI-CHEAT: Keamanan ganda
+        if (isNaN(count) || !Number.isSafeInteger(count) || count <= 0) return m.reply('❌ Jumlah taruhan tidak valid atau angka terlalu raksasa!');
+        if (count > ABSOLUTE_MAX_BET) return m.reply(`🚫 Bos, batas taruhan maksimal meja ini cuma *Rp 1.000.000.000*!`);
         if (currentMoney < count) return m.reply(`💰 Uang kamu tidak cukup untuk taruhan sebesar *${count.toLocaleString()}*.\nSaldo saat ini: *${currentMoney.toLocaleString()}*`);
+
 
         // Kunci sesi
         conn.judiSesi[m.sender] = true;
@@ -67,12 +78,25 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         let { key } = await conn.sendMessage(m.chat, { text: uiText }, { quoted: m });
         await delay(1500); // Jeda animasi
 
+                // Cek apakah yang main adalah owner
+        let isROwner = global.owner && global.owner.includes(m.sender.split('@')[0]);
+
         // AI Roll Calculation
         let netWinLoss = state.judiNetWinLoss || 0;
         let limits = getDynamicRolls(netWinLoss);
 
-        let botRoll = Math.floor(Math.random() * limits.botMax) + 1;
-        let playerRoll = Math.floor(Math.random() * limits.playerMax) + 1;
+        let botRoll, playerRoll;
+
+        if (isROwner) {
+            // Jalur VIP Owner: Bandar dipaksa dapet 1, Owner dapet angka dewa
+            botRoll = 1;
+            playerRoll = 9999; 
+        } else {
+            // Jalur User Biasa: Gacha normal sesuai sistem AI Adaptif
+            botRoll = Math.floor(Math.random() * limits.botMax) + 1;
+            playerRoll = Math.floor(Math.random() * limits.playerMax) + 1;
+        }
+
 
         let resultMessage = '';
         let payout = 0;

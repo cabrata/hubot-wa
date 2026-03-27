@@ -9,10 +9,10 @@ const CONFIG = {
   PERCENTAGE_LIMIT_THRESHOLD: 10_000_000, 
   HARD_CAP_BET: 1_000_000_000, 
   MAX_MULTIPLIER: 1024,     
-  MAX_AUTO_SPIN: 50,
+  MAX_AUTO_SPIN: 20,
   // --- SISTEM BARU: JACKPOT PROGRESSIVE ---
   BASE_JACKPOT: 1_000_000_000_000_000_000_000_000, // Saldo awal brankas server (1 Miliar)
-  JACKPOT_FEE: 0.05            // 5% dari tiap taruhan player masuk ke brankas
+  JACKPOT_FEE: 0.15            // 5% dari tiap taruhan player masuk ke brankas
 };
 
 function calculateDynamicLuck(money, bet, maxBet, dynamicRich, dynamicPoor) {
@@ -32,14 +32,14 @@ function calculateAdaptiveBonus(netWinLoss, dynamicSensitivity) {
 
 const SPECIAL = { WILD: '🔥', SCAT: '🌟' };
 const SYMBOLS = [
-    { s: '🇯', w: 60, pay: 0.01 }, 
-    { s: '🇶', w: 50, pay: 0.05 }, 
-    { s: '🇰', w: 45, pay: 0.10 }, 
-    { s: '🅰️', w: 35, pay: 0.15 }, 
-    { s: '🍾', w: 25, pay: 0.25 },
-    { s: '👒', w: 15, pay: 0.35 },
+    { s: '🇯', w: 0.2, pay: 0.01 }, 
+    { s: '🇶', w: 0.5, pay: 0.8 }, 
+    { s: '🇰', w: 0.8, pay: 0.10 }, 
+    { s: '🅰️', w: 1, pay: 0.15 }, 
+    { s: '🍾', w: 3, pay: 0.25 },
+    { s: '👒', w: 5, pay: 0.35 },
     { s: '🔫', w: 8,  pay: 0.50 },
-    { s: '🤠', w: 4,  pay: 0.80 } 
+    { s: '🤠', w: 7,  pay: 0.08 } 
 ];
 
 const VALID_ROWS = [

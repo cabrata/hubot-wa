@@ -67,13 +67,13 @@ let handler = async (m, { conn, usedPrefix, text }) => {
     if (!user) throw '❌ Pengguna tidak terdaftar di dalam database.';
     if (user.banned) return m.reply('🔒 Informasi dikunci, user banned');
     if (!user.registered) return m.reply(`🔒 Informasi dikunci, user belum terdaftar!\nKetik ${usedPrefix}daftar Nama.Umur`);
+    
     let pp = 'https://telegra.ph/file/168ed310d65b7cb3ef451.jpg'
     try {
         pp = await conn.profilePictureUrl(who, 'image')
     } catch (e) {} 
 
     let about = (await conn.fetchStatus(who).catch(console.error) || {}).status || '~'
-    let username = conn.getName(who)
     let staffData = getStaff()
     let staffInfo = staffData[who] || {}
     
@@ -168,42 +168,45 @@ let handler = async (m, { conn, usedPrefix, text }) => {
         }
     }
 
-    // 🛡️ SAFE PARSE PASANGAN CHAR (Mencegah Error "{" atau undefined)
+    // 🛡️ SAFE PARSE PASANGAN CHAR & DATA ANAK
     let pasChar = user.pasanganChar;
     if (typeof pasChar === 'string') {
         try { pasChar = JSON.parse(pasChar); } catch (e) { pasChar = null; }
     }
+    
+    let anakData = user.anak;
+    if (typeof anakData === 'string') {
+        try { anakData = JSON.parse(anakData); } catch (e) { anakData = []; }
+    }
+    
+    let anakCount = Array.isArray(anakData) ? anakData.length : 0;
+    let anakText = anakCount > 0 ? ` (K${anakCount})` : '';
 
     let pasText = "-"
     if (pasChar && pasChar.name) {
         let pts = Number(pasChar.point || 0)
         let status = "Pdkt 💕"
-        if (pts >= 50 && pts < 200) status = "Pacaran 👩‍❤️‍👨"
-        else if (pts >= 200 && pts < 300) status = "Menikah 💍"
-        else if (pts >= 300) status = "Berkeluarga 🏡"
-        pasText = `${pasChar.name} [${status}]`
+        if (pts >= 50000 && pts < 100000) status = "Pacaran 🥰"
+        else if (pts >= 100000 && pts < 250000) status = "Menikah 💍"
+        else if (pts >= 250000) status = "Berkeluarga 🏡"
+        
+        // Output contoh: Asuka Nishino [Berkeluarga 🏡] (K1)
+        pasText = `${pasChar.name} [${status}]${anakText}`
     }
-    
-    // Pasangan Real WA
-    let pasanganWa = user.rpg?.pasangan || user.pasangan;
-    let pasanganText = (pasanganWa && pasanganWa !== '') ? `@${pasanganWa.split('@')[0]}` : '-'
 
-    // Role & Icon
-    
-
-    // Data Ekonomi (Format angka dipastikan Number agar toLocaleString jalan)
+    // Data Ekonomi
     let moneyDisp = Number(user.money || 0).toLocaleString('id-ID')
     let bankDisp = Number(user.bank || 0).toLocaleString('id-ID')
     let saldoDisp = Number(user.saldo || 0).toLocaleString('id-ID')
     let expDisp = Number(user.exp || 0).toLocaleString('id-ID')
     let limitDisp = Number(user.limit || 0).toLocaleString('id-ID')
      
-            // Filter Nama: Cek apakah target adalah diri sendiri atau orang lain
+    // Filter Nama
     let waName = (who === m.sender) ? m.pushName : await conn.getName(who);
     let finalName = user.name ? user.name : waName;
 
 
-        let str = `
+    let str = `
 ╭─── ·[ *P R O F I L E* ]· ───
 │ 
 │ ${rankIcon} *Name:* ${finalName} ${rankText}
@@ -230,8 +233,7 @@ let handler = async (m, { conn, usedPrefix, text }) => {
 │
 ├─ ·[ 💍 *R E L A T I O N S H I P* ]·
 │
-│ 💖 *Pasangan (Wa):* ${pasanganText}
-│ 🌸 *Pasangan (Char):* ${pasText}
+│ 🌸 *Pasangan:* ${pasText}
 │
 ├─ ·[ 🪪 *C O N T A C T* ]·
 │

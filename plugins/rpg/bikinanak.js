@@ -1,111 +1,106 @@
-const { getUser, updateUser, updateEconomy, updateCooldown } = require('../../lib/database')
+const { getUser, updateUser, updateEconomy } = require('../../lib/database')
+
+// Obeng Sakti: Mengubah String JSON dari SQL
+function parseJSON(data) {
+    if (typeof data === 'string') {
+        try { return JSON.parse(data); } catch (e) { return null; }
+    }
+    return data;
+}
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
     let user = await getUser(m.sender);
     if (!user) return m.reply("❌ User tidak ditemukan di database.");
 
-    let pushname = user.name || m.sender.split('@')[0];
-
-    // ==========================================
-    // KONFIGURASI WAKTU RPG (Jalur Magic & Normal)
-    // ==========================================
-    // Umur Anak & Tagihan: 3 Hari Real-time = 1 Tahun Game
+    // KONFIGURASI WAKTU RPG
     let yearMs = 3 * 24 * 60 * 60 * 1000; 
-    
-    // 🔥 INI YANG ILANG TADI: 1 Bulan Game (buat tagihan) = 6 Jam Real-time
     let monthMs = yearMs / 12; 
-    
-    // Masa Hamil: Fix ±25 Jam Real-time (Biar gak kelamaan nunggu brojol)
     let masaHamilMs = 25.7 * 60 * 60 * 1000; 
-    
-    // UI Kandungan (Biar bar 9 bulannya tetep jalan pas .ck)
-    // 25.7 Jam dibagi 9 bulan = ±2.8 Jam per bulan kandungan
     let monthKandunganMs = masaHamilMs / 9; 
 
-
     // Safe Parsing JSON
-    let pasanganChar = user.pasanganChar;
-    if (typeof pasanganChar === 'string') {
-        try { pasanganChar = JSON.parse(pasanganChar) } catch (e) { pasanganChar = null }
-    }
-
-    let anak = user.anak;
-    if (typeof anak === 'string') {
-        try { anak = JSON.parse(anak) } catch (e) { anak = [] }
-    }
+    let pasanganChar = parseJSON(user.pasanganChar);
+    let anak = parseJSON(user.anak) || [];
     if (!Array.isArray(anak)) anak = [];
 
     let now = Date.now();
 
     switch (command) {
-        // =====================================
-        // COMMAND 1: BIKIN ANAK
-        // =====================================
         case 'bikinanak': {
-            if (!pasanganChar) return m.reply(`Kamu belum punya pasangan 💔\nGunakan command *${usedPrefix}char* untuk mencari pasangan.`);
-            if (user.hamil) return m.reply("Heii aku lagi hamil tauu 😤 sabar dikit napa!");
+            if (!pasanganChar) return m.reply(`Kamu belum punya pasangan 💔\nGunakan command *${usedPrefix}charpas* untuk mencari pasangan.`);
+            if (user.hamil) return m.reply("Heii aku lagi hamil tauu 😤 sabar dikit napa! Tunggu lahir dulu.");
+            
+            // LIMIT ANAK MAKSIMAL 3
+            let anakCount = anak.length;
+            if (anakCount >= 3) {
+                return m.reply(`"Sayang, anak kita udah ${anakCount} loh... KB dulu dong ah, biaya susu mahal tau!" 🙅‍♀️🍼`);
+            }
 
+            // CEK SYARAT POIN (Anak 1 = 250k, Anak 2 = 300k, Anak 3 = 350k)
+            let currentPoint = pasanganChar.point || 0;
+            let requiredPoint = 250000 + (anakCount * 50000);
+
+            if (currentPoint < requiredPoint) {
+                let teksPoin = `⚠️ *POIN CINTA BELUM CUKUP!* ⚠️\n\n`;
+                if (currentPoint < 100000) teksPoin += `Kalian bahkan belum nikah resmi! (Butuh 100k Poin untuk Menikah).\n`;
+                else teksPoin += `Istrimu belum siap untuk punya anak ke-${anakCount + 1}.\n`;
+                
+                teksPoin += `\n🎯 Syarat Point: *${requiredPoint.toLocaleString('id-ID')} Pts*`;
+                teksPoin += `\n💖 Point Kamu: *${currentPoint.toLocaleString('id-ID')} Pts*`;
+                teksPoin += `\n\n_Sering-sering ngajak kencan atau kasih gift dulu sana!_`;
+                return m.reply(teksPoin);
+            }
+
+            // KALO LOLOS SYARAT POIN, LANGSUNG HAMILIN
             await updateUser(m.sender, {
                 hamil: true,
                 hamilStart: now
             });
 
-            m.reply(`💞 Kamu dan ${pasanganChar.name || 'pasanganmu'} sedang ahh ahh~, km mainnya hebat sampe aku hamil🤤\n\n🤰 Status: Hamil\n⏳ Perkiraan kelahiran: ±25 Jam (Jalur Cepat)\n\n> Gunakan *${usedPrefix}ck* untuk mengecek perkembangan.`);
+            m.reply(`💞 Kamu dan ${pasanganChar.name} menghabiskan malam yang panas dan penuh keringat... 🥵💦\n\n🤰 *Status: Istri Hamil Anak ke-${anakCount + 1}!*\n⏳ Perkiraan kelahiran: ±25 Jam\n\n> Gunakan *${usedPrefix}ck* untuk mengecek perkembangan kandungan.`);
             break;
         }
 
-        // =====================================
-        // COMMAND 2: CEK KANDUNGAN / ANAK (CK)
-        // =====================================
         case 'ck': {
             if (user.hamil) {
                 let hamilStart = Number(user.hamilStart || 0);
                 let elapsed = now - hamilStart;
 
                 if (elapsed >= masaHamilMs) {
-                    // Proses Melahirkan
                     anak.push({
                         id: "3275" + (now.toString().slice(-8)) + "000" + (anak.length + 1),
                         nama: `Anak ke-${anak.length + 1}`,
                         gender: Math.random() > 0.5 ? 'Laki-laki 👦' : 'Perempuan 👧',
                         lahir: now,
-                        lastRawat: now // Set waktu rawat pertama kali saat lahir
+                        lastRawat: now 
                     });
 
                     await updateUser(m.sender, {
                         hamil: false,
                         hamilStart: 0,
-                        anak: JSON.stringify(anak) // Simpan balik ke SQL
+                        anak: JSON.stringify(anak)
                     });
 
-                    return m.reply(`🎉 *Oaekk... oaekkk...!*\n\nSelamat! Bayi kamu dan ${pasanganChar?.name || 'pasanganmu'} telah lahir ke dunia. 👶\n\nGunakan *${usedPrefix}kk* untuk melihat detail anakmu.`);
+                    return m.reply(`🎉 *Oaekk... oaekkk...!*\n\nSelamat! Anak ke-${anak.length} kamu dan ${pasanganChar?.name || 'istrimu'} telah lahir ke dunia. 👶\n\nJangan lupa rutin bayar biaya perawatan menggunakan *${usedPrefix}rawatanak* tiap 6 jam!`);
                 } else {
-                    // Masih Hamil
-                    let usiaBulan = Math.floor(elapsed / monthKandunganMs); // Pake rumus kandungan fast-track
+                    let usiaBulan = Math.floor(elapsed / monthKandunganMs);
                     let sisaMs = masaHamilMs - elapsed;
-
                     let jam = Math.floor(sisaMs / (1000 * 60 * 60));
                     let menit = Math.floor((sisaMs % (1000 * 60 * 60)) / (1000 * 60));
-                    
                     let progress = '⬛'.repeat(usiaBulan) + '⬜'.repeat(9 - Math.max(0, usiaBulan));
 
-                    return m.reply(`🤰 *STATUS KANDUNGAN*\n\n🩺 Kondisi: Sehat\n👶 Usia: *${usiaBulan} Bulan*\n📊 Perkembangan: [${progress}]\n⏳ HPL (Real-time): ${jam} jam ${menit} menit lagi.`);
+                    return m.reply(`🤰 *STATUS KANDUNGAN*\n\n🩺 Kondisi: Sehat\n👶 Usia Kandungan: *${usiaBulan} Bulan*\n📊 Perkembangan: [${progress}]\n⏳ HPL (Real-time): ${jam} jam ${menit} menit lagi.`);
                 }
             } else {
-                return m.reply(`Kamu sedang tidak hamil.\nGunakan *${usedPrefix}bikinanak* kalau kamu sudah punya pasangan!`);
+                return m.reply(`Istrimu sedang tidak hamil.\nGunakan *${usedPrefix}bikinanak* kalau poin cinta kalian sudah cukup!`);
             }
         }
 
-        // =====================================
-        // COMMAND 3: RAWAT ANAK (SISTEM TAGIHAN AKUMULATIF)
-        // =====================================
         case 'rawatanak': {
             if (anak.length === 0) return m.reply(`Kamu belum punya anak yang lahir!\nCek status kehamilan menggunakan *${usedPrefix}ck*.`);
 
             let currentMoney = Number(user.economy?.money || user.money || 0);
-            
-            let totalBiaya = 0;
-            let totalIncome = 0;
+            let totalBiaya = 0, totalIncome = 0;
             let logTeks = `📝 *LAPORAN KEUANGAN KELUARGA*\n\n`;
             let isAdaTagihan = false;
             let anakUpdate = []; 
@@ -113,13 +108,9 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
             anak.forEach((a, i) => {
                 let ageMs = now - Number(a.lahir);
                 let umurTahun = Math.floor(ageMs / yearMs);
-                
                 let lastRawat = Number(a.lastRawat || a.lahir);
                 let waktuDitelantarkanMs = now - lastRawat;
-
-                // Siklus kebutuhan: Tiap 6 Jam Real-time (Pake monthMs yg udah gue tambahin)
                 let siklusLewat = Math.floor(waktuDitelantarkanMs / monthMs);
-
                 let tarifPerSiklus = 0;
                 let namaFase = "";
 
@@ -144,21 +135,18 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
                     }
                 }
 
-                a.lastRawat = now;
+                if (siklusLewat > 0) a.lastRawat = now;
                 anakUpdate.push(a);
             });
 
-            if (!isAdaTagihan) {
-                return m.reply(`✅ Semua anakmu sudah terurus.\nTidak ada tagihan saat ini. Cek lagi nanti setelah 6 jam.`);
-            }
+            if (!isAdaTagihan) return m.reply(`✅ Semua anakmu sudah terurus.\nTidak ada tagihan saat ini. Cek lagi nanti setelah 6 jam.`);
 
             if (totalBiaya > 0 && currentMoney < totalBiaya) {
-                return m.reply(`🚨 *TAGIHAN MENUMPUK!* 🚨\n\n💸 Uang kamu tidak cukup untuk membayar hutang biaya hidup anak-anakmu!\n\n📉 Total Nunggak: *Rp${totalBiaya.toLocaleString('id-ID')}*\n💰 Uangmu Saat Ini: *Rp${currentMoney.toLocaleString('id-ID')}*\n\n_Segera cari uang sebelum anakmu diambil Dinas Sosial!_`);
+                return m.reply(`🚨 *TAGIHAN MENUMPUK!* 🚨\n\n💸 Uang kamu tidak cukup untuk membayar biaya hidup anak-anakmu!\n\n📉 Total Nunggak: *Rp${totalBiaya.toLocaleString('id-ID')}*\n💰 Uangmu Saat Ini: *Rp${currentMoney.toLocaleString('id-ID')}*\n\n_Segera cari uang sebelum istrimu ngamuk!_`);
             }
 
             let netMoney = totalIncome - totalBiaya;
             await updateEconomy(m.sender, { money: currentMoney + netMoney });
-            
             await updateUser(m.sender, { anak: JSON.stringify(anakUpdate) });
 
             logTeks += `\n───────────────────\n`;

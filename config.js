@@ -70,9 +70,14 @@ if (!global.trafficInterval) {
         ai.currentRPS = 0
     }, 1000)
 }
+//other
 global.wm = 'HuTao BOT'
+global.ch = '120363373141583166@newsletter'
 // Call tracker
 global.callTracker = global.callTracker || {}
+
+//season
+global.rpgSeason = 2
 
 console.log(chalk.cyan(`[CONFIG] ${global.botName} v${global.botVersion} loaded`))
 

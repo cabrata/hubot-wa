@@ -145,6 +145,18 @@ let handler = async (m, { conn, usedPrefix: _p, text, db }) => {
             totalreg = await prisma.user.count()
         } catch { }
 
+                // ========== COUNT ONLINE USERS ==========
+        let onlineCount = 0;
+        let nowTime = Date.now();
+        if (global.lastCTime) {
+            for (let userJid in global.lastCTime) {
+                // Jika waktu terakhir chat kurang dari 10000 ms (10 detik), hitung online
+                if (nowTime - global.lastCTime[userJid] <= 10000) {
+                    onlineCount++;
+                }
+            }
+        }
+
         // ========== TAG DEFINITIONS ==========
         let tags = {
             'main': '🏠  M A I N',
@@ -199,7 +211,7 @@ let handler = async (m, { conn, usedPrefix: _p, text, db }) => {
         const botType = conn.user.id === global.conn.user.id ? 'Main BOT' : 'Clone BOT'
 
         // ========== HEADER ==========
-        let _text = `${readmore}
+        let _text = `
 ━━━━━━━━━━━━━━━━━━━━━
   ✦  𝗛𝘂𝗧𝗮𝗼  𝗕𝗢𝗧  ✦
 ━━━━━━━━━━━━━━━━━━━━━
@@ -207,7 +219,7 @@ let handler = async (m, { conn, usedPrefix: _p, text, db }) => {
 ${iconWaktu} *${ucapanWaktu}!*
 ┊ 👤 ${displayName}
 ┊ 📱 @${m.sender.replace(/@.+/, '')}
-
+${readmore}
 ╭─「 🖥️ *𝚂𝚢𝚜𝚝𝚎𝚖 𝙸𝚗𝚏𝚘* 」
 ┊
 ┊  ◈  Mode    ➜  ${botMode}
@@ -215,14 +227,16 @@ ${iconWaktu} *${ucapanWaktu}!*
 ┊  ◈  Clock   ➜  ${moment.tz('Asia/Jakarta').format('HH:mm:ss')} WIB
 ┊  ◈  Date    ➜  ${week}, ${date}
 ┊  ◈  Feature ➜  ${totalfeature} commands
-┊  ◈  Users   ➜  ${totalreg} registered
+┊  ◈  Users   ➜  ${totalreg} users
+┊  ◈  Online  ➜  ${onlineCount} active
 ┊  ◈  Uptime  ➜  ${uptime}
+┊  ◈  Season  ➜  ${global.rpgSeason}
 ┊
 ┊  🎊 *New Year ${yearAfter} Countdown*
 ┊  ⏳ ${timeString(selisih)}
 ┊
 ╰──────────────────────
-
+${readmore}
 `
 
         // ========== CATEGORY BLOCKS ==========
@@ -273,7 +287,7 @@ ${iconWaktu} *${ucapanWaktu}!*
         let fekling2 = 'https://i.caliphdev.com/ezgif-6-b4335201ee.webp'
         let adReply2 = {
             title: 'HuTao BOT',
-            body: 'Official Channel',
+            body: 'Season: '+global.rpgSeason,
             thumbnailUrl: fekling2,
             sourceUrl: 'https://whatsapp.com/channel/0029VatzpbmIyPtM90JWFJ1m',
             mediaType: 2,

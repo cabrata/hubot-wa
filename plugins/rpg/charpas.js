@@ -5,7 +5,6 @@ const { db, getUser, updateUser } = require('../../lib/database');
 const fs = require('fs');
 const path = require('path');
 
-// OBENG SAKTI: Fungsi buat ngubah String JSON dari Database SQL jadi Objek beneran
 function parseJSON(data) {
     if (typeof data === 'string') {
         try { return JSON.parse(data); } catch (e) { return null; }
@@ -28,401 +27,240 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
         case 'characterpas':
         case 'charpas': {
             let query = text;
-            if (!query) return m.reply(`Format salah! Cara penggunaan:\n${usedPrefix + command} query\nContoh:\n${usedPrefix + command} Kano chinatsu`);
-
+            if (!query) return m.reply(`Format salah! Cara penggunaan:\n${usedPrefix + command} query`);
             try {
                 m.reply(wait);
                 const char = new Characters();
                 let data
-                if (!isNaN(query)) {
-                  data = await char.getCharacterFullById(query);
-                    } else {
-                var search = await malScraper.getResultsFromSearch(query, 'character');
-                const hasil = search[0];
-                if (!hasil) return m.reply('Character not found.');
-
-                
-                data = await char.getCharacterFullById(hasil.id);
+                if (!isNaN(query)) data = await char.getCharacterFullById(query);
+                else {
+                    var search = await malScraper.getResultsFromSearch(query, 'character');
+                    if (!search[0]) return m.reply('Character not found.');
+                    data = await char.getCharacterFullById(search[0].id);
                 }
                 let animeData = data.anime && data.anime.length > 0 ? data.anime[0] : null;
-                
                 let nik = data.nicknames.map(nick => nick);
                 if (nik.length > 1) {
                     const lastNik = nik.pop();
                     nik = `- *Nicknames:* \`${nik.join(', ')}, and ${lastNik}\``;
-                } else {
-                    nik = `- *Nickname:* \`${nik.join(', ')}\``;
-                }
+                } else nik = `- *Nickname:* \`${nik.join(', ')}\``;
 
                 const sVoiceJ = data.voices ? data.voices.find(item => item.language === 'Japanese') : null;
                 let voiceActor = sVoiceJ ? `${sVoiceJ.person.name} (Japanese)` : 'Unknown';
 
-                let teksChar = `🎭 *CHARACTER INFO*\n\n`;
-                teksChar += `*\`${data.name}${data.name_kanji == null ? '' : ' ('+data.name_kanji+')'}\`*\n`;
-                if (animeData) {
-                    teksChar += `- *From:* \`${animeData.anime.title}\`\n`;
-                    teksChar += `- *Role:* \`${animeData.role == null ? 'Nothing' : animeData.role}\`\n`;
-                }
-                teksChar += `${data.nicknames == '' ? '- *Nickname:* `Nothing`' : nik}\n`;
-                teksChar += `- *Voice Actor:* \`${voiceActor}\`\n\n`;
-                teksChar += `*mal-id:* \`${data.mal_id}\`\n`;
-                teksChar += `*link:*\n\`${data.url}\``;
+                let teksChar = `🎭 *CHARACTER INFO*\n\n*\`${data.name}${data.name_kanji == null ? '' : ' ('+data.name_kanji+')'}\`*\n`;
+                if (animeData) teksChar += `- *From:* \`${animeData.anime.title}\`\n- *Role:* \`${animeData.role == null ? 'Nothing' : animeData.role}\`\n`;
+                teksChar += `${data.nicknames == '' ? '- *Nickname:* `Nothing`' : nik}\n- *Voice Actor:* \`${voiceActor}\`\n\n*mal-id:* \`${data.mal_id}\`\n*link:*\n\`${data.url}\``;
 
                 let imageUrl = data.images.jpg.image_url;
-
                 await conn.sendMessage(m.chat, { image: { url: imageUrl }, caption: teksChar }, { quoted: m });
-
-                // Stringify data agar aman di SQL
-                await updateUser(m.sender, {
-                    lastCharSearch: JSON.stringify({ name: data.name, mal_id: data.mal_id, image: imageUrl })
-                });
-
-                await conn.sendMessage(m.chat, {
-                    text: `Apakah kamu ingin melamar karakter \`${data.name}\`?\n\n1. Lamar 🤍\n2. Cek pasangan 💍`
-                }, { quoted: m });
-
+                await updateUser(m.sender, { lastCharSearch: JSON.stringify({ name: data.name, mal_id: data.mal_id, image: imageUrl }) });
+                await conn.sendMessage(m.chat, { text: `Apakah kamu ingin melamar karakter \`${data.name}\`?\n\n1. Lamar 🤍\n2. Cek pasangan 💍` }, { quoted: m });
                 global.charSession[m.sender] = true;
-
-            } catch (err) {
-                console.log(err);
-                return m.reply('Error saat mencari character\n' + err);
-            }
+            } catch (err) { return m.reply('Error saat mencari character\n' + err); }
             break;
         }
 
         case 'cekpas': {
             let query = text;
-            if (!query) return m.reply(`Format salah! Cara penggunaan:\n${usedPrefix + command} query\nContoh:\n${usedPrefix + command} Kano chinatsu`);
-
+            if (!query) return m.reply(`Format salah!`);
             try {
                 m.reply(wait);
                 const char = new Characters();
                 let data
-                if (!isNaN(query)) {
-                  data = await char.getCharacterFullById(query);
-                } else {
+                if (!isNaN(query)) data = await char.getCharacterFullById(query);
+                else {
                     var search = await malScraper.getResultsFromSearch(query, 'character');
-                    const hasil = search[0];
-                    if (!hasil) return m.reply('Character not found.');
-                    data = await char.getCharacterFullById(hasil.id);
+                    if (!search[0]) return m.reply('Character not found.');
+                    data = await char.getCharacterFullById(search[0].id);
                 }
-                
                 let namaChar = data.name;
-                
                 let allUsers = await db.user.findMany({ where: { registered: true } });
                 let sudahDimiliki = allUsers.find(u => {
                     let p = parseJSON(u.pasanganChar);
                     return p && p.name === namaChar;
                 });
-                
-                if (sudahDimiliki) {
-                    m.reply(`💔 Yah karakter *${namaChar}* sudah memiliki pasangan.`);
-                } else {
-                    m.reply(`🤍 Karakter *${namaChar}* belum memiliki pasangan.\nKamu bisa melamarnya.`);
-                }
-            } catch (err) {
-                console.log(err);
-                return m.reply('Error saat mencari character\n' + err);
-            }
+                if (sudahDimiliki) m.reply(`💔 Yah karakter *${namaChar}* sudah memiliki pasangan.`);
+                else m.reply(`🤍 Karakter *${namaChar}* belum memiliki pasangan.\nKamu bisa melamarnya.`);
+            } catch (err) { return m.reply('Error\n' + err); }
             break;
         }
 
         case 'pas': {
             let user = await getUser(m.sender)
-            if (!user || !user.pasanganChar)
-                return m.reply("Kamu belum memiliki pasangan. Gunakan .charpas untuk melamar terlebih dahulu 💌");
+            if (!user || !user.pasanganChar) return m.reply("Kamu belum memiliki pasangan. Gunakan .charpas untuk melamar terlebih dahulu 💌");
 
             let pasData = parseJSON(user.pasanganChar);
             if (!pasData) return m.reply("Data pasangan error/kosong.");
+            let anak = parseJSON(user.anak) || [];
 
-            let pasanganList = Array.isArray(pasData) ? pasData : [pasData];
-            if (pasanganList.length === 0) return m.reply("Data pasangan tidak ditemukan.");
-
-            let data = pasanganList[0];
-            let point = data.point || 0;
-            let uang = data.uang || data.money || 0;
+            let point = pasData.point || 0;
+            let uang = pasData.uang || 0;
+            let anakCount = Array.isArray(anak) ? anak.length : 0;
 
             let status = "Pdkt";
-            if (point >= 50 && point < 200) status = "Pacaran";
-            else if (point >= 200 && point < 300) status = "Menikah";
-            else if (point >= 300) status = "Berkeluarga 🏡";
+            if (point >= 50000 && point < 100000) status = "Pacaran 🥰";
+            else if (point >= 100000 && point < 250000) status = "Menikah 💍";
+            else if (point >= 250000) status = "Berkeluarga 🏡";
 
-            let sejak = data.sejak || data.since || Date.now();
+            let sejak = pasData.sejak || Date.now();
             let selisihMenit = Math.floor((Date.now() - sejak) / (1000 * 60));
+            let tanggal = new Date(sejak).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 
-            let tanggal = new Date(sejak).toLocaleDateString("id-ID", {
-                day: "numeric", month: "long", year: "numeric"
-            });
-
-            let teks = `
-╔═════════════════════╗
+            let teks = `╔═════════════════════╗
 ║        *COUPLE PROFILE* ║
 ╚═════════════════════╝
 
-*${pushname} ❤️ ${data.name || "-"}*
+*${pushname} ❤️ ${pasData.name || "-"}*
 ───────────────────────
-*Sudah berpasangan sejak : ${tanggal}*
-*Sudah berpasangan selama : ${selisihMenit} Menit*
+*Sejak:* ${tanggal}
+*Lama Bersama:* ${selisihMenit} Menit
 ───────────────────────
-*Status : ${status}*
-*Love Point : ${point}*
-*Uang pasangan : ${uang}*
-═══════════════════════
-`;
+*Status :* ${status}
+*Love Point :* ${point.toLocaleString('id-ID')} Pts
+*Uang Istri :* Rp${uang.toLocaleString('id-ID')}
+*Jumlah Anak :* ${anakCount} Anak 👶
+═══════════════════════`;
 
-            // Proses pemanggilan file fisik dari storage
-            if (data.mediaPath && fs.existsSync(data.mediaPath)) {
-                if (data.mimetype && data.mimetype.includes("video")) {
-                    await conn.sendMessage(m.chat, { video: { url: data.mediaPath }, caption: teks.trim() }, { quoted: m });
-                } else {
-                    await conn.sendMessage(m.chat, { image: { url: data.mediaPath }, caption: teks.trim() }, { quoted: m });
-                }
-            } else if (data.image) {
-                // Jika belum punya custom foto, ambil foto original dari MyAnimeList
-                await conn.sendMessage(m.chat, { image: { url: data.image }, caption: teks.trim() }, { quoted: m });
-            } else {
-                await m.reply(teks.trim());
-            }
+            if (pasData.mediaPath && fs.existsSync(pasData.mediaPath)) {
+                if (pasData.mimetype && pasData.mimetype.includes("video")) await conn.sendMessage(m.chat, { video: { url: pasData.mediaPath }, caption: teks.trim() }, { quoted: m });
+                else await conn.sendMessage(m.chat, { image: { url: pasData.mediaPath }, caption: teks.trim() }, { quoted: m });
+            } else if (pasData.image) {
+                await conn.sendMessage(m.chat, { image: { url: pasData.image }, caption: teks.trim() }, { quoted: m });
+            } else await m.reply(teks.trim());
 
-            let menu = `
-╭─〔  Couple Interaction 〕─╮
-
-1. Action
-2. Beri Makan
-3. Kirim Uang
-
-Balas dengan angka untuk memilih.
-
-╰──────────────────╯`;
-            await m.reply(menu);
+            await m.reply(`╭─〔  Couple Interaction 〕─╮\n1. Action\n2. Beri Makan\n3. Kirim Uang\n╰──────────────────╯`);
             global.pasMenuSession[m.sender] = true;
             break;
         }
 
         case 'setpas': {
-            let user = await getUser(m.sender)
-            if (!user || !user.pasanganChar) return m.reply("Kamu belum memiliki pasangan. Gunakan .charpas terlebih dahulu 💌");
-
+            let user = await getUser(m.sender);
+            if (!user || !user.pasanganChar) return m.reply("Kamu belum memiliki pasangan.");
             let pasData = parseJSON(user.pasanganChar) || {};
             let media = m.quoted ? m.quoted : m;
-            if (!media.mimetype || !/image|video/.test(media.mimetype)) return m.reply("Reply atau kirim foto/video untuk dijadikan tampilan pasangan.");
+            if (!media.mimetype || !/image|video/.test(media.mimetype)) return m.reply("Reply foto/video untuk setpas.");
 
-            const cooldown = 30 * 60 * 1000;
             let now = Date.now();
-
             if (global.setPasCooldown[m.sender]) {
-                let sisa = global.setPasCooldown[m.sender] + cooldown - now;
-                if (sisa > 0) {
-                    let menit = Math.floor(sisa / 60000);
-                    let detik = Math.floor((sisa % 60000) / 1000);
-                    return m.reply(`Tunggu ${menit}m ${detik}s sebelum request lagi ⏳`);
-                }
+                let sisa = global.setPasCooldown[m.sender] + (30 * 60 * 1000) - now;
+                if (sisa > 0) return m.reply(`Tunggu ${Math.floor(sisa / 60000)}m sebelum request lagi.`);
             }
 
             let groupStaff = "120363368633822650@g.us";
             let requestId = Date.now();
             let buffer;
+            try { buffer = await media.download(); } catch { return m.reply("Download gagal."); }
 
-            try {
-                buffer = await media.download();
-                if (!buffer) throw new Error("Download gagal");
-            } catch {
-                return m.reply("Gagal mengambil media. Coba kirim ulang.");
-            }
-
-            global.setPasRequest[requestId] = {
-                user: m.sender, chat: m.chat, buffer: buffer, mimetype: media.mimetype, name: pasData.name || "Unknown"
-            };
-
+            global.setPasRequest[requestId] = { user: m.sender, chat: m.chat, buffer, mimetype: media.mimetype, name: pasData.name };
             global.setPasCooldown[m.sender] = now;
-            m.reply("✅ Request perubahan tampilan pasangan sudah dikirim ke staff.");
+            m.reply("✅ Request setpas dikirim ke staff.");
 
-            let notifStaff = `
-📩 *SET PAS REQUEST*
-
-👤 User: @${m.sender.split('@')[0]}
-📞 wa.me/${m.sender.split('@')[0]}
-
-💞 *Info Pasangan User*
-• Nama: ${pasData.name || '-'}
-• Gender: ${pasData.gender || '-'}
-• Source: ${pasData.source || '-'}
-• ID Char: ${pasData.id || '-'}
-
-🆔 Request ID: ${requestId}
-
-Gunakan:
-.approvepas ${requestId}
-.rejectpas ${requestId} <reason>
-`;
-
-            if (/image/.test(media.mimetype)) {
-                await conn.sendMessage(groupStaff, { image: buffer, caption: notifStaff, mentions: [m.sender] });
-            } else if (/video/.test(media.mimetype)) {
-                await conn.sendMessage(groupStaff, { video: buffer, caption: notifStaff, mentions: [m.sender] });
-            }
+            let notifStaff = `📩 *SET PAS REQUEST*\nUser: @${m.sender.split('@')[0]}\nChar: ${pasData.name || '-'}\nID: ${requestId}\nGunakan:\n.approvepas ${requestId}\n.rejectpas ${requestId}`;
+            if (/image/.test(media.mimetype)) await conn.sendMessage(groupStaff, { image: buffer, caption: notifStaff, mentions: [m.sender] });
+            else await conn.sendMessage(groupStaff, { video: buffer, caption: notifStaff, mentions: [m.sender] });
             break;
         }
 
         case 'approvepas': {
-            let caller = await getUser(m.sender)
-            let isROwner = global.owner.includes(m.sender.split('@')[0]);
-            let isStaff = isROwner || caller?.moderator || caller?.timSupport
-            if (!isStaff) return m.reply("Only staff can use this command.");
+            let caller = await getUser(m.sender);
+            let isStaff = global.owner.includes(m.sender.split('@')[0]) || caller?.moderator || caller?.timSupport;
+            if (!isStaff) return m.reply("Only staff.");
             
-            let id = args[0];
-            if (!id) return m.reply("Masukkan ID request.");
-
-            let data = global.setPasRequest[id];
-            if (!data) return m.reply("Request tidak ditemukan.");
-
-            let user = await getUser(data.user)
+            let id = args[0]; if (!id) return m.reply("Masukkan ID request.");
+            let data = global.setPasRequest[id]; if (!data) return m.reply("Request tidak ditemukan.");
+            let user = await getUser(data.user);
             if (!user || !user.pasanganChar) return m.reply("User belum memiliki pasangan.");
 
             let userPas = parseJSON(user.pasanganChar) || {};
-            
-            // Konfigurasi direktori penyimpanan
             let folderDir = path.join(__dirname, '../../pasangan');
-            if (!fs.existsSync(folderDir)) {
-                fs.mkdirSync(folderDir, { recursive: true });
-            }
-
-            // Tentukan ekstensi berdasarkan mimetype
+            if (!fs.existsSync(folderDir)) fs.mkdirSync(folderDir, { recursive: true });
             let ext = data.mimetype.includes('video') ? 'mp4' : 'jpg';
             let fileName = `${data.user.split('@')[0]}.${ext}`;
             let filePath = path.join(folderDir, fileName);
 
-            // Jika sebelumnya sudah punya foto/video (misal jpg lalu diganti mp4), hapus yang lama biar bersih
             if (userPas.mediaPath && fs.existsSync(userPas.mediaPath)) {
-                fs.unlinkSync(userPas.mediaPath);
+                try { fs.unlinkSync(userPas.mediaPath); } catch(e){}
             }
-
-            // Simpan buffer ke dalam folder
             fs.writeFileSync(filePath, data.buffer);
 
-            // Update nested JSON di SQL, cuma nyimpen path/lokasi foldernya doang!
-            await updateUser(data.user, { 
-                pasanganChar: JSON.stringify({ 
-                    ...userPas, 
-                    mediaPath: filePath, 
-                    mimetype: data.mimetype 
-                }) 
-            });
-
-            await conn.sendMessage(data.chat, {
-                text: `✨ Tampilan pasangan kamu berhasil diperbarui!\n\nCharacter: ${data.name}`,
-                mentions: [data.user]
-            });
-
+            await updateUser(data.user, { pasanganChar: JSON.stringify({ ...userPas, mediaPath: filePath, mimetype: data.mimetype }) });
+            await conn.sendMessage(data.chat, { text: `✨ Tampilan pasangan diperbarui!\nCharacter: ${data.name}`, mentions: [data.user] });
             delete global.setPasRequest[id];
-            m.reply("✅ Setpass berhasil disetujui dan media disimpan di server.");
+            m.reply("✅ Disetujui.");
             break;
         }
 
         case 'rejectpas': {
-            let caller = await getUser(m.sender)
-            let isROwner = global.owner.includes(m.sender.split('@')[0]);
-            let isStaff = isROwner || caller?.moderator || caller?.timSupport
-            if (!isStaff) return m.reply("Only staff can use this command.");
-
-            let id = args[0];
-            if (!id) return m.reply("Masukkan ID request.");
-
-            let reason = args.slice(1).join(" ") || "No reason provided.";
-            let data = global.setPasRequest[id];
-            if (!data) return m.reply("Request tidak ditemukan.");
-
-            await conn.sendMessage(data.chat, { text: `❌ Request setpas kamu ditolak.\n\nReason: ${reason}`, mentions: [data.user] });
-
+            let caller = await getUser(m.sender);
+            let isStaff = global.owner.includes(m.sender.split('@')[0]) || caller?.moderator || caller?.timSupport;
+            if (!isStaff) return m.reply("Only staff.");
+            let id = args[0]; if (!id) return m.reply("Masukkan ID.");
+            let reason = args.slice(1).join(" ") || "No reason.";
+            let data = global.setPasRequest[id]; if (!data) return m.reply("Not found.");
+            await conn.sendMessage(data.chat, { text: `❌ Request setpas ditolak.\nReason: ${reason}`, mentions: [data.user] });
             delete global.setPasRequest[id];
-            m.reply("❌ Setpas berhasil ditolak.");
+            m.reply("Ditolak.");
             break;
         }
 
         case 'act': {
-            let user = await getUser(m.sender)
+            let user = await getUser(m.sender);
             if (!user?.pasanganChar) return m.reply("Kamu belum memiliki pasangan.");
 
-            const cooldown = 60 * 1000;
             let now = Date.now();
-
             if (global.actCooldown[m.sender]) {
-                let sisa = global.actCooldown[m.sender] + cooldown - now;
-                if (sisa > 0) {
-                    let detik = Math.ceil(sisa / 1000);
-                    return m.reply(`Tunggu ${detik} detik lagi sebelum melakukan aksi lagi`);
-                }
+                let sisa = global.actCooldown[m.sender] + 60000 - now;
+                if (sisa > 0) return m.reply(`Tunggu ${Math.ceil(sisa / 1000)} detik lagi.`);
             }
-
             global.actCooldown[m.sender] = now;
+
             let pasangan = parseJSON(user.pasanganChar) || {};
+            let currentPoint = pasangan.point || 0;
 
             const normalAct = [
-                { short: "Ajak Makan Malam", fullText: "Kamu mengajak pasanganmu makan malam romantis.", point: 20 },
-                { short: "Nonton Bareng", fullText: "Kamu nonton film bareng pasanganmu.", point: 15 },
-                { short: "Jalan Sore", fullText: "Kamu jalan sore sambil pegangan tangan.", point: 18 },
-                { short: "Peluk Hangat", fullText: "Kamu memeluk pasanganmu dengan hangat.", point: 12 },
-                { short: "Masak Favoritnya", fullText: "Kamu memasakkan makanan favoritnya.", point: 22 },
-                { short: "Video Call", fullText: "Kamu video call sampai larut malam.", point: 14 }
+                { short: "Ajak Makan Malam", fullText: "Kamu mengajak pasanganmu makan malam romantis.", point: 250 },
+                { short: "Nonton Bareng", fullText: "Kamu nonton film bareng pasanganmu.", point: 200 },
+                { short: "Jalan Sore", fullText: "Kamu jalan sore sambil pegangan tangan.", point: 180 },
+                { short: "Masak Favoritnya", fullText: "Kamu memasakkan makanan favoritnya.", point: 300 }
             ];
 
-            const adultActs = [
+            const romanceActs = [
                 { short: "Cium Pasangan", type: "adult", adultType: "kiss" },
-                { short: "Malam Romantis", type: "adult", adultType: "romance" },
-                { short: "Bikin Anak", type: "adult", adultType: "baby" }
+                { short: "Malam Romantis", type: "adult", adultType: "romance" }
             ];
 
             let actList = [...normalAct];
-            if (Math.random() < 0.5) {
-                let randomAdult = adultActs[Math.floor(Math.random() * adultActs.length)];
-                actList.push(randomAdult);
+
+            // Kebuka cuma kalo udah nikah (100k pts)
+            if (currentPoint >= 100000 && Math.random() < 0.6) {
+                actList.push(romanceActs[Math.floor(Math.random() * romanceActs.length)]);
             }
 
             let shuffled = actList.sort(() => 0.5 - Math.random());
             let selected = shuffled.slice(0, 3);
-
             global.actSession[m.sender] = { list: selected };
 
-            let teks = `
-╭───〔  A C T I O N   M E N U  〕───╮
-
-   Partner  : ${pasangan.name || '-'}
-   Love Pts : ${pasangan.point || 0}
-
-╰──────────────────────╯
-
-Choose one action:
-
-`;
+            let teks = `╭───〔  A C T I O N   M E N U  〕───╮\n   Partner  : ${pasangan.name || '-'}\n   Love Pts : ${currentPoint.toLocaleString('id-ID')}\n╰──────────────────────╯\nChoose action:\n\n`;
             selected.forEach((v, i) => { teks += `   ${i + 1}. ${v.short}\n`; });
-            teks += `\n────────────────────────\nReply with number (1 - 3)`;
-
+            teks += `\n────────────────────────\nReply number (1 - 3)\n_Tips: 100k Pts buat Nikah, kalau mau bikin anak pakai command .bikinanak!_`;
             m.reply(teks);
             break;
         }
     }
 };
 
-// ==========================================
-// SESSION HANDLER UNTUK INTERAKSI COUPLE
-// ==========================================
 handler.before = async function (m, { conn }) {
     global.actSession = global.actSession || {};
     global.charSession = global.charSession || {};
     global.pasMenuSession = global.pasMenuSession || {};
     global.putusSession = global.putusSession || {};
-
-    let budy = m.text;
-    if (!budy) return;
+    let budy = m.text; if (!budy) return;
 
     if (global.actSession[m.sender]) {
         let session = global.actSession[m.sender];
         let user = await getUser(m.sender);
-
-        if (!user || !user.pasanganChar) {
-            delete global.actSession[m.sender];
-            return;
-        }
+        if (!user || !user.pasanganChar) { delete global.actSession[m.sender]; return; }
 
         if (['1', '2', '3'].includes(budy)) {
             let pilihan = parseInt(budy) - 1;
@@ -434,86 +272,49 @@ handler.before = async function (m, { conn }) {
             let newPoint = before;
 
             if (selected.type === "adult") {
-                if (before < 200) {
-                    let ngambek = ["Ihh apaan sih? Kita belum nikah tau 😠", "Baru kenal udah aneh-aneh aja kamu!", "Aku nggak mau ah, belum waktunya 🙄", "Kamu apasih... aku jadi malu banget!"];
-                    let randomNgambek = ngambek[Math.floor(Math.random() * ngambek.length)];
-                    
-                    newPoint = Math.max(0, before - 30);
-                    await updateUser(m.sender, { pasanganChar: JSON.stringify({ ...pasData, point: newPoint }) });
-                    
-                    m.reply(randomNgambek);
-                    m.reply(`Pass Point : ${before} --> ${newPoint}`);
-                } else {
-                    let suksesText = [];
-                    if (selected.adultType === "kiss") {
-                        suksesText = ["Kamu mencium pasanganmu dengan lembut... dia jadi salting 😳", "Dia membalas ciumanmu dengan malu-malu.", "Duh kamu ini... bikin aku deg-degan tau!"];
-                        newPoint += 35;
-                    }
-                    if (selected.adultType === "romance") {
-                        suksesText = ["Malam itu terasa hangat dan penuh cinta 💕", "Kalian menghabiskan waktu romantis bersama.", "Dia tersenyum malu sambil memelukmu erat."];
-                        newPoint += 50;
-                    }
-                    if (selected.adultType === "baby") {
-                        suksesText = ["duhh enakk sayangg~", "ahh~", "sayangg mending di kasur aja biar makin enakkk~"];
-                        newPoint += 70;
-                    }
-                    
-                    await updateUser(m.sender, { pasanganChar: JSON.stringify({ ...pasData, point: newPoint }) });
-                    let randomSukses = suksesText[Math.floor(Math.random() * suksesText.length)];
-                    m.reply(randomSukses);
-                    m.reply(`Pass Point : ${before} --> ${newPoint}`);
+                if (selected.adultType === "kiss") {
+                    newPoint += 1000;
+                    m.reply("Kamu mencium pasanganmu dengan lembut... dia membalasnya dengan mesra. 💕");
+                } else if (selected.adultType === "romance") {
+                    newPoint += 2500;
+                    m.reply("Malam itu terasa hangat dan penuh cinta... kalian menghabiskan waktu bersama. 🌙❤️");
                 }
             } else {
                 newPoint += selected.point;
-                await updateUser(m.sender, { pasanganChar: JSON.stringify({ ...pasData, point: newPoint }) });
                 m.reply(selected.fullText);
-                m.reply(`Pass Point : ${before} --> ${newPoint}`);
             }
+            
+            await updateUser(m.sender, { pasanganChar: JSON.stringify({ ...pasData, point: newPoint }) });
+            m.reply(`Pass Point : ${before.toLocaleString('id-ID')} --> ${newPoint.toLocaleString('id-ID')}`);
             delete global.actSession[m.sender];
             return true; 
         }
     } 
     else if (global.charSession[m.sender]) {
         let user = await getUser(m.sender)
-        if (!user || !user.lastCharSearch) {
-            delete global.charSession[m.sender];
-            return;
-        }
-
+        if (!user || !user.lastCharSearch) { delete global.charSession[m.sender]; return; }
         if (['1', '2'].includes(budy)) {
             let searchData = parseJSON(user.lastCharSearch) || {};
             let namaChar = searchData.name;
-            
-            // Cek di database apakah karakter sudah ada yang punya
             let allUsers = await db.user.findMany({ where: { registered: true } });
             let sudahDimiliki = allUsers.find(u => {
                 let p = parseJSON(u.pasanganChar);
                 return p && p.name === namaChar;
             });
-
             if (budy === '1') {
-                if (user.pasanganChar) {
-                    m.reply('Kamu sudah memiliki pasangan anime💢.');
-                } else {
-                    if (sudahDimiliki) {
-                        m.reply(`💔 Gagal! ${namaChar} sudah memiliki pasangan.`);
-                    } else {
-                        await updateUser(m.sender, {
-                            pasanganChar: JSON.stringify({
-                                name: searchData.name, mal_id: searchData.mal_id, image: searchData.image, point: 0, uang: 0, sejak: Date.now()
-                            }),
-                            lastCharSearch: null
-                        });
-                        m.reply(`🤍 Selamat! Kamu berhasil melamar ${namaChar} 💖`);
-                    }
+                if (user.pasanganChar) m.reply('Kamu sudah memiliki pasangan anime💢.');
+                else if (sudahDimiliki) m.reply(`💔 Gagal! ${namaChar} sudah memiliki pasangan.`);
+                else {
+                    await updateUser(m.sender, {
+                        pasanganChar: JSON.stringify({ name: searchData.name, mal_id: searchData.mal_id, image: searchData.image, point: 0, uang: 0, sejak: Date.now() }),
+                        lastCharSearch: null
+                    });
+                    m.reply(`🤍 Selamat! Kamu berhasil melamar ${namaChar} 💖\n_Tips: Kumpulkan 100k Love Point untuk Menikah resminya!_`);
                 }
             }
             if (budy === '2') {
-                if (sudahDimiliki) {
-                    m.reply(`💔 Yah karakter *${namaChar}* sudah memiliki pasangan.`);
-                } else {
-                    m.reply(`🤍 Karakter *${namaChar}* belum memiliki pasangan.\nKamu bisa melamarnya.`);
-                }
+                if (sudahDimiliki) m.reply(`💔 Yah karakter *${namaChar}* sudah memiliki pasangan.`);
+                else m.reply(`🤍 Karakter *${namaChar}* belum memiliki pasangan.\nKamu bisa melamarnya.`);
             }
             delete global.charSession[m.sender];
             return true;
@@ -521,11 +322,7 @@ handler.before = async function (m, { conn }) {
     } 
     else if (global.pasMenuSession[m.sender]) {
         let user = await getUser(m.sender)
-        if (!user || !user.pasanganChar) {
-            delete global.pasMenuSession[m.sender];
-            return;
-        }
-
+        if (!user || !user.pasanganChar) { delete global.pasMenuSession[m.sender]; return; }
         if (['1', '2', '3'].includes(budy)) {
             if (budy === '1') {
                 delete global.pasMenuSession[m.sender];
@@ -533,41 +330,28 @@ handler.before = async function (m, { conn }) {
             }
             if (budy === '2') {
                 let pasData = parseJSON(user.pasanganChar) || {};
-                await updateUser(m.sender, { 
-                    pasanganChar: JSON.stringify({ ...pasData, point: (pasData.point || 0) + 10 }) 
-                });
-                m.reply("🥘 Kamu memberi makan pasanganmu. +10 Point");
+                await updateUser(m.sender, { pasanganChar: JSON.stringify({ ...pasData, point: (pasData.point || 0) + 100 }) });
+                m.reply("🥘 Kamu memberi makan pasanganmu. +100 Point");
             }
-            if (budy === '3') {
-                m.reply("Gunakan .transferpas jumlah untuk memberi uang 💵");
-            }
+            if (budy === '3') m.reply("Gunakan .transferpas jumlah untuk memberi uang 💵");
             delete global.pasMenuSession[m.sender];
             return true;
         }
     } 
     else if (global.putusSession[m.sender]) {
         let user = await getUser(m.sender)
-        if (!user || !user.pasanganChar) {
-            delete global.putusSession[m.sender];
-            return;
-        }
-
+        if (!user || !user.pasanganChar) { delete global.putusSession[m.sender]; return; }
         if (['1', '2'].includes(budy)) {
             if (budy === '1') {
                 let pasData = parseJSON(user.pasanganChar) || {};
                 let nama = pasData.name || "pasanganmu";
-                
-                // Kalau ada file custom image/video, sekalian kita hapus fisiknya dari server
                 if (pasData.mediaPath && fs.existsSync(pasData.mediaPath)) {
-                    try { fs.unlinkSync(pasData.mediaPath); } catch (e) { console.log("Gagal menghapus file:", e); }
+                    try { fs.unlinkSync(pasData.mediaPath); } catch (e) {}
                 }
-
                 await updateUser(m.sender, { pasanganChar: null })
-                m.reply(`💔 Kamu resmi putus dengan ${nama}...`);
+                m.reply(`💔 Kamu resmi putus dengan ${nama}...\nHak asuh anak jatuh ke tangan Istri. 🥀`);
             }
-            if (budy === '2') {
-                m.reply("❤️ Kamu memutuskan untuk tetap bersama.");
-            }
+            if (budy === '2') m.reply("❤️ Kamu memutuskan untuk tetap bersama demi anak-anak.");
             delete global.putusSession[m.sender];
             return true;
         }

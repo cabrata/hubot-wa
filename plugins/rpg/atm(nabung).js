@@ -52,6 +52,6 @@ let handler = async (m, { conn, command, args, usedPrefix }) => {
 handler.help = ['atm <jumlah>', 'atm all']
 handler.tags = ['rpg']
 handler.command = /^(atm([0-9]+)|atm|atmall|nabung)$/i
-handler.limit = true
+//handler.limit = true
 
 module.exports = handler

@@ -9,7 +9,7 @@ const CONFIG = {
     DEALER_STANDS_ON: 17,  
     BLACKJACK_PAYOUT: 2.5, // Total return (Bet kembali + 1.5x profit)
     WIN_PAYOUT: 2.0,       // Total return (Bet kembali + 1x profit)
-    SENSITIVITY_RANGE: 10_000_000 // Jangkauan AI membaca kekalahan/kemenangan
+    SENSITIVITY_RANGE: 10_000 // Jangkauan AI membaca kekalahan/kemenangan
 };
 
 const CARDS = {
@@ -19,7 +19,7 @@ const CARDS = {
 const cardKeys = Object.keys(CARDS);
 
 // AI Adaptif: Memanipulasi isi tumpukan kartu berdasarkan performa player
-function dealCard(isPlayer, netWinLoss) {
+/*function dealCard(isPlayer, netWinLoss) {
     let deck = [...cardKeys];
     
     // Hitung status W/L (-1.0 sampai 1.0)
@@ -33,6 +33,21 @@ function dealCard(isPlayer, netWinLoss) {
     // Jika player menang terlalu banyak (aiBias > 0.2), bandar main lebih agresif
     else if (!isPlayer && aiBias > 0.2) {
         deck.push('10', 'J', 'Q', 'K'); 
+    }
+
+    const key = deck[Math.floor(Math.random() * deck.length)];
+    return { key, value: CARDS[key] };
+}*/
+// AI Licik: Memanipulasi isi tumpukan kartu biar player selalu apes
+function dealCard(isPlayer, netWinLoss) {
+    let deck = [...cardKeys];
+    
+    if (isPlayer) {
+        // Penuhi deck player dengan kartu kecil (2, 3, 4, 5) biar gampang BUST saat nambah kartu
+        deck.push('2', '3', '4', '5', '6', '2', '3', '4'); 
+    } else {
+        // Penuhi deck bandar dengan kartu besar (10, J, Q, K, A) biar gampang Blackjack atau dapet 20
+        deck.push('10', 'J', 'Q', 'K', 'A', '10', 'K'); 
     }
 
     const key = deck[Math.floor(Math.random() * deck.length)];
@@ -88,17 +103,25 @@ let handler = async (m, { conn, args, usedPrefix }) => {
         return m.reply(`⏳ Bandar sedang mengocok kartu, tunggu *${timeLeft} detik* lagi.`);
     }
 
-    let currentMoney = user.money || 0;
-    const maxBet = Math.max(CONFIG.MIN_BET, Math.floor(currentMoney * CONFIG.MAX_BET_PERCENT));
+        let currentMoney = user.money || 0;
+    
+    // 🛡️ BIKIN LIMIT: Maksimal bet di kasino adalah 1 Miliar biar kalkulator JS ga meledak
+    const ABSOLUTE_MAX_BET = 1000000000; 
+    
+    let calculatedMaxBet = Math.floor(currentMoney * CONFIG.MAX_BET_PERCENT);
+    const maxBet = Math.min(calculatedMaxBet, ABSOLUTE_MAX_BET); // Ambil limit teraman
 
     if (args.length < 1) return m.reply(`❓ Gunakan format: *${usedPrefix}casino <jumlah|all>*\nContoh: *${usedPrefix}casino 5000*`);
     
     let bet = args[0].toLowerCase() === 'all' ? maxBet : Math.floor(Number(args[0]));
 
-    if (isNaN(bet) || bet <= 0) return m.reply('❌ Jumlah taruhan tidak valid! Gunakan angka atau "all".');
+    // 🛡️ ANTI-CHEAT: Cek kalau angkanya minus, huruf, atau kelewatan batas
+    if (isNaN(bet) || !Number.isSafeInteger(bet) || bet <= 0) return m.reply('❌ Jumlah taruhan tidak valid! Angka terlalu besar atau format salah.');
+    if (bet > ABSOLUTE_MAX_BET) return m.reply(`🚫 Batas maksimal taruhan kasino adalah *Rp 1.000.000.000* per sesi untuk mencegah eksploitasi bug.`);
     if (bet < CONFIG.MIN_BET) return m.reply(`💸 Taruhan minimal adalah *${CONFIG.MIN_BET.toLocaleString()}*.`);
     if (bet > maxBet) return m.reply(`🚫 Taruhanmu melebihi batas! Maksimal taruhanmu saat ini adalah *${maxBet.toLocaleString()}* (25% dari saldo).`);
     if (currentMoney < bet) return m.reply(`💰 Uangmu tidak cukup. Saldo saat ini: *${currentMoney.toLocaleString()}*.`);
+
 
     // Kunci Sesi Player
     conn.casino[m.sender] = true;

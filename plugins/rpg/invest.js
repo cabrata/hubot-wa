@@ -141,13 +141,13 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         if (amount > 1000000) return m.reply(`🚫 Transaksi ditolak! Maksimal pembelian adalah 1.000.000 koin per transaksi untuk mencegah manipulasi pasar.`);
 
         const totalCost = Math.floor((price * amount) * (1 + TRANSACTION_FEE));
-        if (userMoney < totalCost) return m.reply(`💰 Uang kurang! Butuh *${formatMoney(totalCost)}*`);
+        if (m.user.money < totalCost) return m.reply(`💰 Uang kurang! Butuh *${formatMoney(totalCost)}*`);
 
         if (!investData[item]) investData[item] = { amount: 0, totalCost: 0 };
         investData[item].amount += amount;
         investData[item].totalCost += totalCost; 
 
-        await updateEconomy(m.sender, { money: userMoney - totalCost });
+        await updateEconomy(m.sender, { money: m.user.money - totalCost });
         await updateUser(m.sender, { invest: JSON.stringify(investData) });
 
         applyMarketImpactLocale(market, item, amount, true);
@@ -182,7 +182,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         investData[item].totalCost -= (avgCost * amount);
         if (investData[item].amount <= 0) delete investData[item];
 
-        await updateEconomy(m.sender, { money: userMoney + netRev });
+        await updateEconomy(m.sender, { money: m.user.money + netRev });
         await updateUser(m.sender, { invest: JSON.stringify(investData) });
 
         applyMarketImpactLocale(market, item, amount, false);

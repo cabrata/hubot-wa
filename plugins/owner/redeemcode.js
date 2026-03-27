@@ -33,6 +33,46 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
         return crypto.randomBytes(length).toString('hex').slice(0, length).toUpperCase();
     }
 
+    // --- HELPER: PENERJEMAH LID & GRUP UNTUK SEMUA COMMAND ---
+    async function resolveMentions(textStr) {
+        let targets = [];
+        if (!textStr) return targets;
+        
+        let rawMentions = m.mentionedJid && m.mentionedJid.length > 0 ? m.mentionedJid : conn.parseMention(textStr);
+        
+        // Terjemahkan LID jika dilakukan di dalam grup
+        if (m.chat.endsWith('@g.us') && rawMentions.length > 0) {
+            try {
+                let groupMeta = await conn.groupMeta(m.chat);
+                for (let jid of rawMentions) {
+                    if (jid.endsWith('@lid')) {
+                        let participant = groupMeta.participants.find(p => p.lid === jid);
+                        if (participant && participant.id) {
+                            targets.push(participant.id);
+                        } else {
+                            targets.push(jid);
+                        }
+                    } else {
+                        targets.push(jid);
+                    }
+                }
+            } catch (e) {
+                targets.push(...rawMentions);
+            }
+        } else {
+            targets.push(...rawMentions);
+        }
+
+        // Tangkap ID Grup (@g.us) langsung dari text jika ada
+        let groupMatch = textStr.match(/\d+@g\.us/g);
+        if (groupMatch) {
+            targets.push(...groupMatch);
+        }
+        
+        return [...new Set(targets)]; // Hapus duplikat
+    }
+    // ---------------------------------------------------------
+
     // --- AUTO CLEAN UP EXPIRED REDEEMS ---
     const now = Date.now();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
@@ -52,6 +92,7 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
     let userMemory = m.user || {};
 
     if (command === 'createredeem') {
+        
         var moneys = 2500000;
         var exps = 25000;
         var limits = 100;
@@ -60,7 +101,9 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
         var limitusers = 50;
 
         let [money, exp, limit, saldo, expired, limituser, code, tagged] = text.split('|');
-        let tagUser = m.mentionedJid.length > 0 ? m.mentionedJid : conn.parseMention(text);
+        
+        // Gunakan fungsi pintar kita buat nangkep target
+        let tagUser = await resolveMentions(text);
         
         let staffs = []; 
         let isOwner = staffs.includes(m.sender) || (global.owner && global.owner.includes(m.sender.split('@')[0]));
@@ -146,8 +189,12 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
         
         if (tagUser.length > 0) {
             let expiredDate = new Date(expiredAt).toLocaleString();
-            for (let user of tagUser) {
-                await conn.sendMessage(user, { text: `📢 Kamu telah ditambahkan sebagai penerima kode redeem *${code}*.\nBerlaku sampai: ${expiredDate}`, mentions: [m.sender] });
+            for (let target of tagUser) {
+                if (target.endsWith('@g.us')) {
+                    await conn.sendMessage(target, { text: `📢 Grup ini telah ditambahkan sebagai penerima kode redeem *${code}*.\nBerlaku sampai: ${expiredDate}` });
+                } else {
+                    await conn.sendMessage(target, { text: `📢 Kamu telah ditambahkan sebagai penerima kode redeem *${code}*.\nBerlaku sampai: ${expiredDate}`, mentions: [target] });
+                }
             }
             return;
         }
@@ -155,7 +202,6 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
         await delay(500);
         let teks = `*KODE REDEEM BARU!*\n*\`${code}\`*\n\n- Kadaluarsa: ${expired} hari\n- Batas Pengguna: ${limituser} orang\nCara penggunaan:\nKetik #redeem ${code}\n\n*Bantu kami untuk mengembangkan komunitas HuTao BOT dengan cara sawer kami di https://saweria.co/hutaobot*\n> _KODE REDEEM BARU HANYA DIBAGIKAN DI CHANNEL INI_\n> This message was sent automatically using a bot`;
         
-        // --- BYPASS ERROR BAILEYS, MENGGUNAKAN CARA SIMPLE ---
         await global.conn.sendMessage('120363373141583166@newsletter', {
             text: teks,
             contextInfo: {
@@ -189,11 +235,16 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
        
         if (redeem.creator === m.sender) return conn.reply(m.chat, 'Pembuat kode dilarang claim kode redeem buatan sendiri!', m);
         if (claimStr.includes(m.sender)) return conn.reply(m.chat, 'Kamu sudah menggunakan kode redeem ini sebelumnya.', m);
-        if (blockedStr.includes(m.sender)) return conn.reply(m.chat, 'Kamu telah diblokir dari menggunakan kode ini.', m);
         
-        if (forWhoStr.length > 0 && !forWhoStr.includes(m.sender)) {
-            return conn.reply(m.chat, 'Kamu tidak termasuk dalam daftar penerima kode ini.', m);
+        // --- LOGIKA CEK GRUP & USER BERSAMAAN ---
+        let isBlocked = blockedStr.includes(m.sender) || blockedStr.includes(m.chat);
+        if (isBlocked) return conn.reply(m.chat, 'Kamu (atau grup ini) telah diblokir dari menggunakan kode ini.', m);
+        
+        let isForWho = forWhoStr.length === 0 || forWhoStr.includes(m.sender) || forWhoStr.includes(m.chat);
+        if (!isForWho) {
+            return conn.reply(m.chat, 'Kamu tidak termasuk dalam daftar penerima kode ini.\n\nHarap gunakan kode ini di grup yang telah ditambahkan.', m);
         }
+        // ----------------------------------------
 
         if (claimStr.length >= redeem.limituser) {
             return conn.reply(m.chat, 'Kode redeem ini sudah mencapai batas kuota pengguna.', m);
@@ -204,7 +255,6 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
 
         let reward = rewardNum;
         
-        // --- FIX SQL: PISAH TABEL USER DAN ECONOMY ---
         await updateUser(m.sender, {
             exp: (Number(userSql.exp) || 0) + (reward.exp || 0),
             limit: (Number(userSql.limit) || 0) + (reward.limit || 0)
@@ -214,9 +264,9 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
             money: (Number(userSql.economy?.money || userSql.money) || 0) + (reward.money || 0),
             saldo: (Number(userSql.economy?.saldo || userSql.saldo) || 0) + (reward.saldo || 0)
         });
-        // ---------------------------------------------
 
         claimStr.push(m.sender);
+        // Hapus m.sender jika dia diinvite personal (jangan hapus grupnya biar orang lain di grup bisa claim)
         forWhoStr = forWhoStr.filter(u => u !== m.sender);
         
         await db.redeemCode.update({
@@ -229,6 +279,8 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
 
     if (command === 'addclaim') {
         let [code, newUsersRaw] = text.split('|');
+        if (!code) throw `Format salah! ${usedPrefix + command} kode|tag_atau_idgrup`;
+        
         let redeem = await db.redeemCode.findUnique({ where: { code } });
         if (!redeem) return conn.reply(m.chat, 'Kode tidak ditemukan.', m);
         
@@ -237,21 +289,9 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
 
         if (redeem.creator !== m.sender) return conn.reply(m.chat, 'Hanya pembuat kode yang bisa menambah penerima.', m);
         if (Date.now() > Number(redeem.expired)) throw 'Kode tersebut sudah expired';
-        if (!newUsersRaw) throw 'Tag salah satu user atau masukkan ID grup';
-
-        let newUsers = [];
-        let isGroup = /@g\.us$/.test(newUsersRaw.trim());
-
-        if (isGroup) {
-            try {
-                let groupMeta = await conn.groupMeta(newUsersRaw.trim());
-                newUsers = groupMeta.participants.map(p => p.id).filter(id => id !== conn.user.jid);
-            } catch (e) {
-                return conn.reply(m.chat, 'Gagal mengambil data grup. Pastikan bot ada di grup tersebut.', m);
-            }
-        } else {
-            newUsers = m.mentionedJid.length > 0 ? m.mentionedJid : conn.parseMention(text);
-        }
+        
+        let newUsers = await resolveMentions(newUsersRaw || text);
+        if (newUsers.length === 0) throw 'Tag salah satu user atau masukkan ID grup';
 
         let alreadyInForWho = [];
         let alreadyClaimed = [];
@@ -263,7 +303,7 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
             else toAdd.push(u);
         }
 
-        if (toAdd.length === 0) throw 'Tidak ditemukan pengguna yang valid (semua sudah terdaftar/klaim).';
+        if (toAdd.length === 0) throw 'Tidak ditemukan pengguna yang valid (semua target sudah terdaftar/klaim).';
         forWhoStr.push(...toAdd);
         
         await db.redeemCode.update({
@@ -271,18 +311,20 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
             data: { forWho: forWhoStr }
         });
 
-        let addedMentions = toAdd.map(u => '@' + u.split('@')[0]);
+        let addedMentions = toAdd.map(u => u.endsWith('@g.us') ? 'Grup (' + u + ')' : '@' + u.split('@')[0]);
         let replyMsg = addedMentions.length > 0 ? `✅ Berhasil menambahkan ${addedMentions.join(', ')} ke daftar penerima kode *${code}*\n` : '';
 
-        if (isGroup && toAdd.length > 0) {
-            await conn.sendMessage(newUsersRaw.trim(), { text: `📢 Kalian semua telah ditambahkan sebagai penerima kode redeem *${code}*`, mentions: toAdd }, { quoted: m });
-        } else {
-            for (let user of toAdd) {
-                await conn.sendMessage(user, { text: `📢 Kamu telah ditambahkan sebagai penerima kode redeem *${code}*.`, mentions: [m.sender] });
+        for (let target of toAdd) {
+            if (target.endsWith('@g.us')) {
+                await conn.sendMessage(target, { text: `📢 Grup ini telah ditambahkan sebagai penerima kode redeem *${code}*` });
+            } else {
+                await conn.sendMessage(target, { text: `📢 Kamu telah ditambahkan sebagai penerima kode redeem *${code}*.`, mentions: [target] });
             }
         }
 
-        await conn.reply(m.chat, replyMsg.trim() || 'Semua user sudah terdaftar/klaim.', m, { mentions: [...toAdd, ...alreadyInForWho, ...alreadyClaimed] });
+        // Filter mentions supaya Baileys ga error (hanya kirim format nomor)
+        let mentionsOnly = [...toAdd, ...alreadyInForWho, ...alreadyClaimed].filter(v => v.endsWith('@s.whatsapp.net'));
+        await conn.reply(m.chat, replyMsg.trim() || 'Semua target sudah terdaftar/klaim.', m, { mentions: mentionsOnly });
     }
 
     if (command === 'delclaim') {
@@ -292,8 +334,8 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
         let forWhoStr = parseJSON(redeem.forWho) || [];
         if (redeem.creator !== m.sender) return conn.reply(m.chat, '❌ Hanya pembuat kode yang bisa menghapus penerima.', m);
 
-        let removeUsers = m.mentionedJid.length > 0 ? m.mentionedJid : conn.parseMention(text);
-        if (removeUsers.length === 0) throw 'Tag salah satu user dulu!';
+        let removeUsers = await resolveMentions(removeUsersText || text);
+        if (removeUsers.length === 0) throw 'Tag salah satu user/grup dulu!';
 
         let removed = [];
         for (let user of removeUsers) {
@@ -308,8 +350,9 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
             data: { forWho: forWhoStr }
         });
 
-        let removedMentions = removed.map(u => '@' + u.split('@')[0]);
-        return conn.reply(m.chat, removedMentions.length > 0 ? `✅ Berhasil menghapus ${removedMentions.join(', ')} dari daftar penerima.` : '⚠️ User tidak terdaftar.', m, { mentions: removed });
+        let removedMentions = removed.map(u => u.endsWith('@g.us') ? 'Grup (' + u + ')' : '@' + u.split('@')[0]);
+        let mentionsOnly = removed.filter(v => v.endsWith('@s.whatsapp.net'));
+        return conn.reply(m.chat, removedMentions.length > 0 ? `✅ Berhasil menghapus ${removedMentions.join(', ')} dari daftar penerima.` : '⚠️ Target tidak terdaftar di daftar penerima.', m, { mentions: mentionsOnly });
     }
 
     if (command === 'delclaimed') {
@@ -319,7 +362,7 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
         let claimStr = parseJSON(redeem.claim) || [];
         if (redeem.creator !== m.sender) return conn.reply(m.chat, '❌ Hanya pembuat kode yang bisa menghapus data klaim.', m);
 
-        let removeUsers = m.mentionedJid.length > 0 ? m.mentionedJid : conn.parseMention(m.text);
+        let removeUsers = await resolveMentions(removeUsersText || text);
         if (removeUsers.length === 0) throw 'Tag salah satu user dulu!';
 
         let removed = [];
@@ -335,8 +378,9 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
             data: { claim: claimStr }
         });
 
-        let removedMentions = removed.map(u => '@' + u.split('@')[0]);
-        return conn.reply(m.chat, removedMentions.length > 0 ? `✅ Berhasil menghapus ${removedMentions.join(', ')} dari daftar klaim.` : '⚠️ User belum klaim.', m, { mentions: removed });
+        let removedMentions = removed.map(u => u.endsWith('@g.us') ? 'Grup (' + u + ')' : '@' + u.split('@')[0]);
+        let mentionsOnly = removed.filter(v => v.endsWith('@s.whatsapp.net'));
+        return conn.reply(m.chat, removedMentions.length > 0 ? `✅ Berhasil menghapus ${removedMentions.join(', ')} dari daftar klaim.` : '⚠️ Target belum klaim kode ini.', m, { mentions: mentionsOnly });
     }
 
     if (command === 'blockclaim') {
@@ -346,14 +390,14 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
         let blockedStr = parseJSON(redeem.blocked) || [];
         if (redeem.creator !== m.sender) return conn.reply(m.chat, '❌ Hanya pembuat kode yang bisa memblokir user.', m);
 
-        let blockedUsers = m.mentionedJid.length > 0 ? m.mentionedJid : conn.parseMention(m.text);
-        if (blockedUsers.length === 0) throw 'Tag salah satu user dulu!';
+        let blockedUsers = await resolveMentions(blockedUsersText || text);
+        if (blockedUsers.length === 0) throw 'Tag salah satu user atau masukkan ID grup dulu!';
 
         let newlyBlocked = [];
-        for (let user of blockedUsers) {
-            if (!blockedStr.includes(user)) {
-                blockedStr.push(user);
-                newlyBlocked.push(user);
+        for (let target of blockedUsers) {
+            if (!blockedStr.includes(target)) {
+                blockedStr.push(target);
+                newlyBlocked.push(target);
             }
         }
 
@@ -362,8 +406,9 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
             data: { blocked: blockedStr }
         });
 
-        let addedMentions = newlyBlocked.map(u => '@' + u.split('@')[0]);
-        return conn.reply(m.chat, addedMentions.length > 0 ? `🚫 User diblokir dari klaim kode *${code}*: ${addedMentions.join(', ')}\n` : '⚠️ Sudah diblokir sebelumnya.', m, { mentions: newlyBlocked });
+        let addedMentions = newlyBlocked.map(u => u.endsWith('@g.us') ? 'Grup (' + u + ')' : '@' + u.split('@')[0]);
+        let mentionsOnly = newlyBlocked.filter(v => v.endsWith('@s.whatsapp.net'));
+        return conn.reply(m.chat, addedMentions.length > 0 ? `🚫 Target diblokir dari klaim kode *${code}*: ${addedMentions.join(', ')}\n` : '⚠️ Sudah diblokir sebelumnya.', m, { mentions: mentionsOnly });
     }
 
     if (command === 'delcode') {
@@ -379,19 +424,22 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
         let rewardNum = parseJSON(redeem.reward) || {};
 
         if (forWhoStr.length > 0) {
-            for (let user of forWhoStr) {
-                await conn.delay(1500);
-                await global.conn.sendText(user, `📢 Maaf kode redeem ${code} dihapus oleh pembuat redeem. Anda tidak dapat mengklaim kode tersebut.`);
+            for (let target of forWhoStr) {
+                await delay(1500);
+                if (target.endsWith('@g.us')) {
+                    await global.conn.sendMessage(target, { text: `📢 Maaf kode redeem ${code} dihapus oleh pembuat redeem. Grup ini tidak dapat mengklaim kode tersebut lagi.`});
+                } else {
+                    await global.conn.sendMessage(target, { text: `📢 Maaf kode redeem ${code} dihapus oleh pembuat redeem. Anda tidak dapat mengklaim kode tersebut.`});
+                }
             }
         }
 
         if (claimStr.length > 0) {
             for (let user of claimStr) {
-                await conn.delay(1500);
+                await delay(1500);
                 let targetUser = await getUser(user);
                 
                 if (targetUser) {
-                    // --- FIX SQL: PISAH TABEL USER DAN ECONOMY ---
                     await updateUser(user, {
                         exp: Math.max(0, (Number(targetUser.exp) || 0) - (rewardNum.exp || 0)),
                         limit: Math.max(0, (Number(targetUser.limit) || 0) - (rewardNum.limit || 0))
@@ -401,9 +449,8 @@ let handler = async (m, { conn, text, args, command, usedPrefix }) => {
                         money: Math.max(0, (Number(targetUser.economy?.money || targetUser.money) || 0) - (rewardNum.money || 0)),
                         saldo: Math.max(0, (Number(targetUser.economy?.saldo || targetUser.saldo) || 0) - (rewardNum.saldo || 0))
                     });
-                    // ---------------------------------------------
                     
-                    await global.conn.sendText(user, `📢 Maaf kode redeem ${code} dihapus oleh pembuat redeem. Hasil klaim anda telah ditarik ulang.`);
+                    await global.conn.sendMessage(user, { text: `📢 Maaf kode redeem ${code} dihapus oleh pembuat redeem. Hasil klaim anda telah ditarik ulang.`});
                 }
             }
         }

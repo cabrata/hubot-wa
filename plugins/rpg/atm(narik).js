@@ -24,7 +24,7 @@ let handler = async (m, { conn, command, args }) => {
 handler.help = ['pull *<amount>*', 'pullall']
 handler.tags = ['rpg']
 handler.command = /^pull([0-9]+)|pull|pullall$/i
-handler.limit = false
-handler.regsitered = true
+//handler.limit = false
+handler.register = true
 
 module.exports = handler

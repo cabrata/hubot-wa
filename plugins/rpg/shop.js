@@ -1,4 +1,4 @@
-const { getUser, updateEconomy, updateRpg, updateJob, addInventory, getTool, setTool } = require('../../lib/database')
+const { db, getUser, updateEconomy, updateRpg, updateJob, addInventory, getTool, setTool } = require('../../lib/database')
 
 const fm = (number) => new Intl.NumberFormat('id-ID').format(number);
 
@@ -26,7 +26,7 @@ const shopItems = {
 
     // Kategori: Barang Umum & Mining
     potion: { buy: 20000, sell: 100, category: 'Barang', type: 'inventory' },
-    coal: { buy: 1500, sell: 1000, category: 'Barang', type: 'inventory' },
+    coal: { buy: 1500, sell: 1000, marketKey: 'coal', category: 'Barang', type: 'inventory' }, // <-- BATU BARA TERINTEGRASI
     berlian: { buy: 150000, sell: 10000, category: 'Barang', type: 'economy' },
     sampah: { buy: 120, sell: 5, category: 'Barang', type: 'inventory' },
     kaleng: { buy: 400, sell: 100, category: 'Barang', type: 'inventory' },
@@ -69,25 +69,99 @@ const shopItems = {
 };
 
 // =========================================================
-// FUNGSI MENDAPATKAN HARGA (Normal vs Investasi)
+// SISTEM HARGA LOKAL (Toko Biasa, Bukan Investasi)
 // =========================================================
-function getPrice(itemName, type) {
+global.localShopPrices = global.localShopPrices || {};
+global.lastShopUpdate = global.lastShopUpdate || 0;
+
+function updateLocalPrices() {
+    const now = Date.now();
+    
+    // Inisialisasi awal jika belum ada
+    for (let key in shopItems) {
+        if (!shopItems[key].marketKey && !global.localShopPrices[key]) {
+             global.localShopPrices[key] = {
+                 buy: shopItems[key].buy,
+                 sell: shopItems[key].sell
+             };
+        }
+    }
+
+    // Update harga toko biasa otomatis setiap 10 menit (600000 ms)
+    if (now - global.lastShopUpdate > 600000) { 
+        for (let key in shopItems) {
+            // Berlaku cuma buat barang yang GAK ADA marketKey-nya
+            if (!shopItems[key].marketKey) {
+                let currentBuy = global.localShopPrices[key].buy;
+                let currentSell = global.localShopPrices[key].sell;
+                
+                // Bikin harga goyang naik/turun maksimal 15% dari harga saat ini
+                let change = (Math.random() * 0.3) - 0.15; 
+                
+                global.localShopPrices[key] = {
+                    buy: Math.max(1, Math.floor(currentBuy * (1 + change))),
+                    sell: Math.max(0, Math.floor(currentSell * (1 + change)))
+                };
+            }
+        }
+        global.lastShopUpdate = now;
+    }
+}
+
+// =========================================================
+// SISTEM SUPPLY & DEMAND LOKAL (Harga bereaksi pas dibeli)
+// =========================================================
+function applyLocalImpact(itemName, amount, isBuying) {
+    if (!global.localShopPrices[itemName]) return;
+    
+    // Sensitivitas: Makin banyak diborong, makin mahal
+    let impact = amount / 20000000; 
+    if (impact > 0.05) impact = 0.05; // Maksimal naik/turun 5% per transaksi biar gak patah
+    
+    let currentBuy = global.localShopPrices[itemName].buy;
+    let currentSell = global.localShopPrices[itemName].sell;
+    
+    if (isBuying) {
+        // Harga naik karena Demand tinggi
+        global.localShopPrices[itemName].buy = Math.max(1, Math.floor(currentBuy * (1 + impact)));
+        global.localShopPrices[itemName].sell = Math.max(0, Math.floor(currentSell * (1 + impact)));
+    } else {
+        // Harga turun karena Supply banyak
+        global.localShopPrices[itemName].buy = Math.max(1, Math.floor(currentBuy * (1 - impact)));
+        global.localShopPrices[itemName].sell = Math.max(0, Math.floor(currentSell * (1 - impact)));
+    }
+}
+
+// =========================================================
+// FUNGSI MENDAPATKAN HARGA (Realistis dari Database & Lokal)
+// =========================================================
+async function getPrice(itemName, type) {
     let item = shopItems[itemName];
     if (!item) return 0;
     
-    // Tarik harga dinamis dari Pasar Investasi di RAM
-    if (item.marketKey && global.market?.assets?.[item.marketKey]) {
-        const currentMarket = global.market.assets[item.marketKey].currentPrice;
-        return type === 'buy' ? currentMarket : Math.floor(currentMarket * 0.7); 
+    // 1. Cek apakah ini barang Investasi Resmi (.ind)
+    if (item.marketKey) {
+        try {
+            const asset = await db.marketAsset.findUnique({ where: { id: item.marketKey } });
+            if (asset) {
+                // Harga jual ke toko = 70% dari harga pasar saat ini biar bandar untung
+                return type === 'buy' ? asset.currentPrice : Math.floor(asset.currentPrice * 0.7); 
+            }
+        } catch (err) {
+            console.error("Gagal mengambil data market:", err);
+        }
+    }
+    
+    // 2. Jika BUKAN barang investasi (kayak Potion), pakai sistem Pasar Lokal
+    updateLocalPrices();
+    if (global.localShopPrices[itemName]) {
+        return type === 'buy' ? global.localShopPrices[itemName].buy : global.localShopPrices[itemName].sell;
     }
     
     return type === 'buy' ? item.buy : item.sell;
 }
 
-// =========================================================
-// FUNGSI AUTO-GENERATE MENU TOKO
-// =========================================================
-function generateShopMenu() {
+async function generateShopMenu() {
     let menu = `╸╸━━━「 *TOKO RPG* 」━━━╺╺\n`;
     menu += `⚠️ _Harga dengan (📈) mengikuti Pasar Investasi_\n\n`;
     
@@ -100,10 +174,10 @@ function generateShopMenu() {
 
     for (const cat in categories) {
         menu += `> *${cat}*\n`;
-        categories[cat].forEach(item => {
+        for (const item of categories[cat]) {
             let nama = item.name.charAt(0).toUpperCase() + item.name.slice(1);
-            let hBuy = fm(getPrice(item.name, 'buy'));
-            let hSell = fm(getPrice(item.name, 'sell'));
+            let hBuy = fm(await getPrice(item.name, 'buy'));
+            let hSell = fm(await getPrice(item.name, 'sell'));
             
             let currTag = item.buyCurr === 'diamond' ? ' (Diamond)' : (item.buyCurr === 'tiketcoin' ? ' (Kupon)' : '');
             let trend = item.marketKey ? ' 📈' : '';
@@ -113,7 +187,7 @@ function generateShopMenu() {
             } else {
                 menu += `🛒 ${nama}: Beli ${hBuy}${currTag} | (Tidak bisa dijual)\n`;
             }
-        });
+        }
         menu += `\n`;
     }
     
@@ -144,9 +218,14 @@ let handler = async (m, { conn, command, args, usedPrefix }) => {
         count = parseInt(args[1]);
     }
 
-    count = (count && count > 0) ? Math.min(999999999999999, count) : 1;
+    // Batasi maksimal beli/jual 1 juta item per transaksi biar ga jebol limit Javascript!
+    count = (count && count > 0) ? Math.min(1000000, count) : 1; 
+    
+    // Tambahan anti-bug angka minus/huruf:
+    if (isNaN(count) || !Number.isSafeInteger(count)) return m.reply('❌ Jumlah tidak valid!');
 
-    if (!action || !itemReq) return conn.reply(m.chat, generateShopMenu(), m);
+
+    if (!action || !itemReq) return conn.reply(m.chat, await generateShopMenu(), m);
 
     // =========================================================
     // LOGIKA KHUSUS ARMOR (Karena beli bertahap / Leveling)
@@ -171,7 +250,7 @@ let handler = async (m, { conn, command, args, usedPrefix }) => {
     // LOGIKA UMUM TRANSAKSI (Otomatis deteksi jenis penyimpanan)
     // =========================================================
     let itemData = shopItems[itemReq];
-    if (!itemData) return conn.reply(m.chat, `❌ Barang *${itemReq}* tidak dijual di toko ini.\nKetik *.shop* untuk melihat daftar barang.`, m);
+    if (!itemData) return conn.reply(m.chat, `❌ Barang *${itemReq}* tidak dijual di toko ini.\nKetik *.shop* untuk melihat daftar barang.\n\n` + await generateShopMenu(), m);
 
     let dbField = itemData.dbField || itemReq; 
     let buyCurr = itemData.buyCurr || 'money';
@@ -180,7 +259,7 @@ let handler = async (m, { conn, command, args, usedPrefix }) => {
     let economyCurrencies = ['money', 'diamond', 'tiketcoin', 'poin', 'emas', 'iron', 'cupon', 'berlian'];
 
     if (action === 'buy') {
-        let pricePerItem = getPrice(itemReq, 'buy');
+        let pricePerItem = await getPrice(itemReq, 'buy');
         if (pricePerItem === 0) return m.reply(`❌ Item ini tidak bisa dibeli.`);
         let totalPrice = pricePerItem * count;
 
@@ -212,10 +291,13 @@ let handler = async (m, { conn, command, args, usedPrefix }) => {
             await setTool(m.sender, dbField, { level: 1, durability: 50 });
         }
 
+        // Terapkan efek harga lokal naik
+        if (!itemData.marketKey) applyLocalImpact(itemReq, count, true);
+
         m.reply(`✅ Sukses membeli *${fm(count)} ${itemReq}* seharga *${fm(totalPrice)} ${buyCurr}*`);
         
     } else if (action === 'sell') {
-        let pricePerItem = getPrice(itemReq, 'sell');
+        let pricePerItem = await getPrice(itemReq, 'sell');
         if (pricePerItem === 0) return m.reply(`❌ Item *${itemReq}* tidak bisa dijual ke toko.`);
         let totalRevenue = pricePerItem * count;
 
@@ -254,9 +336,12 @@ let handler = async (m, { conn, command, args, usedPrefix }) => {
             await addInventory(m.sender, sellCurr, totalRevenue);
         }
 
+        // Terapkan efek harga lokal turun
+        if (!itemData.marketKey) applyLocalImpact(itemReq, count, false);
+
         m.reply(`✅ Sukses menjual *${fm(count)} ${itemReq}*, kamu mendapatkan *${fm(totalRevenue)} ${sellCurr}*`);
     } else {
-        return conn.reply(m.chat, generateShopMenu(), m);
+        return conn.reply(m.chat, await generateShopMenu(), m);
     }
 }
 

@@ -1,3 +1,5 @@
+const { updateUser } = require('../../lib/database.js')
+
 // Obeng Sakti: Mengubah String JSON dari SQL
 function parseJSON(data) {
     if (typeof data === 'string') {
@@ -8,7 +10,6 @@ function parseJSON(data) {
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
     let user = m.user
-   // if (!user) return m.reply("Data user kamu tidak ditemukan di database.");
 
     let pasData = parseJSON(user.pasanganChar);
     if (!pasData) {
@@ -59,8 +60,11 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     // Tambahkan point
     pasData.point = (pasData.point || 0) + bonusPoint;
 
-    // Simpan kembali ke database (Stringify)
-    user.pasanganChar = JSON.stringify(pasData);
+    // SAVE KE DATABASE BIAR GA GAIB!
+    await updateUser(m.sender, {
+        money: user.money,
+        pasanganChar: JSON.stringify(pasData)
+    });
 
     // Output struk ala-ala ngasih amplop
     let teks = `💸 *TRANSFER KE PASANGAN BERHASIL* 💸\n\n`;

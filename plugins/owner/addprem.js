@@ -4,10 +4,12 @@ module.exports = {
     name: 'addprem',
     command: ['addprem', 'aprem'],
     category: 'owner',
-    owner: true,
+    rowner: true,
     desc: 'Menambahkan masa aktif premium ke user',
 
     async handler({ m, args }) {
+           let owner = global.owner.includes(m.sender.split('@')[0])
+        if (!owner) return m.reply('Fitur ini hanya khusus owner!')
         if (!args[0]) return m.reply(`*Format salah!*\n\nContoh: *.addprem @user 30*\n(30 = jumlah hari)`)
 
         // Match user from reply or mention

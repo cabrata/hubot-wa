@@ -60,14 +60,27 @@ module.exports = {
             const isTS = isROwner || users.timSupport
 
             // Self mode check
-            if (!(isOwner || isMods || m.fromMe) && global.selfMode) return
+            if (!(isROwner || isMods || m.fromMe) && global.selfMode) return
 
+            // Anti-Macet check: Return jika user kena limit cooldown, kecuali owner
+            if (!isOwner && conn.userCd && conn.lastCmdTime && conn.userCd[m.sender]) {
+                 let waktuSekarang = Date.now();
+                 let waktuTerakhirCmd = conn.lastCmdTime[m.sender] || 0;
+                 let batasCooldown = conn.userCd[m.sender];
+
+    // Jika jarak waktu dari command terakhir masih kurang dari batas cooldown, abaikan comman
+            if (waktuSekarang - waktuTerakhirCmd < batasCooldown) return;
+             }
+            
             // detect self bot and no detect message from any
             if (m.isBaileys && !isROwner) return
 
             // Busy mode check
-            if ((!isTS || !isMods || !isPrems) && (Date.now() < global.botBusyUntil) && global.hasSentBusyMessage[m.chat]) return
-
+            if ((!isTS && !isMods && !isPrems) && (Date.now() < global.botBusyUntil) && global.hasSentBusyMessage[m.chat]) return
+            
+            //resetting season
+            if (!isROwner && global.isResettingSeason && global.hasSentBusyMessage[m.chat]) return
+            
             //banned
             m.user = await getUser(m.sender);
             m.chatData = await getChat(m.chat);

@@ -4,10 +4,12 @@ module.exports = {
     name: 'delprem',
     command: ['delprem', 'dprem'],
     category: 'owner',
-    owner: true,
+    rowner: true,
     desc: 'Menghapus masa aktif premium user',
 
     async handler({ m, args }) {
+        let owner = global.owner.includes(m.sender.split('@')[0])
+        if (!owner) return m.reply('Fitur ini hanya khusus owner!')
         let who = m.mentionedJid[0] ? m.mentionedJid[0] : m.quoted ? m.quoted.sender : m.text.replace(/[^0-9]/g, '') + '@s.whatsapp.net'
         if (!who || !who.includes('@s.whatsapp.net')) return m.reply('Tag/reply orangnya bejir!')
 

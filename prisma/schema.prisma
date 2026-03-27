@@ -113,6 +113,8 @@ model User {
   // ── Relations ──
   economy    UserEconomy?
   rpg        UserRpg?
+  carpas     Carpas?
+  dungeon    UserDungeon?
   cooldown   UserCooldown?
   jobStats   UserJob?
   inventory  UserInventory[]
@@ -288,6 +290,33 @@ model UserRpg {
   user User @relation(fields: [jid], references: [jid], onDelete: Cascade)
 
   @@map("user_rpg")
+}
+
+// =============================================
+//  USER DUNGEON (Solo Exploration Session)
+// =============================================
+model UserDungeon {
+  jid            String  @id
+
+  // ── Session State ──
+  inSession      Boolean @default(false)
+  currentFloor   Int     @default(1)
+  maxFloor       Int     @default(1)
+  bossCleared    Int     @default(0)
+  monstersKilled Int     @default(0)
+
+  // ── Accumulated Loot (Sesi Saat Ini) ──
+  sessionMoney   BigInt  @default(0)
+  sessionExp     BigInt  @default(0)
+  sessionItems   Json    @default("{}") // Buat nyimpen drop item sementara
+
+  // ── In-Dungeon Battle Stats ──
+  mana           Int     @default(100)
+  maxMana        Int     @default(100)
+
+  user User @relation(fields: [jid], references: [jid], onDelete: Cascade)
+
+  @@map("user_dungeon")
 }
 
 // =============================================
@@ -515,6 +544,28 @@ model Chat {
 }
 
 // =============================================
+//  CARPAS (Cari Pasangan Profile)
+// =============================================
+model Carpas {
+  jid        String   @id
+  nama       String
+  umur       Int
+  gender     String
+  lat        Float
+  lon        Float
+  media      String
+  catatan    String   @default("")
+  likes      Int      @default(0)
+  dislikes   Int      @default(0)
+  seen       Json     @default("[]")
+  blacklist  Json     @default("{}")
+
+  user       User     @relation(fields: [jid], references: [jid], onDelete: Cascade)
+
+  @@map("carpas")
+}
+
+// =============================================
 //  GUILD
 // =============================================
 model Guild {
@@ -567,7 +618,11 @@ model StaffActivity {
   modCmds       Int    @default(0)
   inactiveDays  Int    @default(0)
   lastResetDay  String @default("2026-01-01")
-
+  busyReason    String @default("-")
+  busyTime      String @default("-")
+  targetCmds    Int    @default(50)
+  targetModCmds Int    @default(20)
+  
   @@map("staff_activity")
 }
 

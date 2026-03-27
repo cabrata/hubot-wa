@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
   RICH_THRESHOLD: 100_000_000,
   POOR_THRESHOLD: 100_000,
   PERCENTAGE_LIMIT_THRESHOLD: 10_000_000,
-  LUCK_BONUS: 0.1,
+  LUCK_BONUS: -2,
 };
 
 const SPECIAL_GROUP_CONFIG = {
@@ -22,7 +22,18 @@ const SPECIAL_GROUP_CONFIG = {
   RICH_THRESHOLD: 500_000_000,
   POOR_THRESHOLD: 1_000_000,
   PERCENTAGE_LIMIT_THRESHOLD: 50_000_000,
-  LUCK_BONUS: 0.3,
+  LUCK_BONUS: -1,
+};
+
+const SPECIAL_OWNER_CONFIG = {
+  ...DEFAULT_CONFIG,
+  COOLDOWN: 2000,
+  MAX_BET_PERCENT: 0.75,
+  RICH_THRESHOLD: 500_000_000_000_000_000_000_000_000_000_000,
+  POOR_THRESHOLD: 1_000_000_000_000_000_000_000_000,
+  PERCENTAGE_LIMIT_THRESHOLD: 50_000_000_000_000_000_000_000_000,
+  LUCK_BONUS: 9999999999999,
+  MAX_PAYOUT_MULTIPLIER: 9007199254740991 // Batas aman JS
 };
 
 const SIMULATE = false;
@@ -42,12 +53,12 @@ const SYMBOLS_BASE = [
 ];
 
 const PAYOUT = {
-  '👑': { three: { min: 45, max: 80 }, two: { min: 7, max: 10 } },
-  '💎': { three: { min: 20, max: 45 },  two: { min: 3, max: 7 } },
-  '⭐': { three: { min: 10, max: 20 },  two: { min: 1.5, max: 3 } },
-  '🔔': { three: { min: 6,  max: 15 },  two: { min: 0.95, max: 1.2 } },
-  '🍋': { three: { min: 3,  max: 7 },   two: { min: 0.90, max: 1 } },
-  '🍒': { three: { min: 2,  max: 5 },   two: { min: 0.70, max: 0.90 } }
+  '👑': { three: { min: 10, max: 15 }, two: { min: 5, max: 10 } },
+  '💎': { three: { min: 7, max: 10 },  two: { min: 3, max: 5 } },
+  '⭐': { three: { min: 5, max: 7 },  two: { min: 1, max: 3 } },
+  '🔔': { three: { min: 3,  max: 1.5 },  two: { min: 0.8, max: 1 } },
+  '🍋': { three: { min: 1.5,  max: 3 },   two: { min: 0.6, max: 0.8 } },
+  '🍒': { three: { min: 1.5,  max: 1.2 },   two: { min: 0.5, max: 0.6 } }
 };
 
 function getRandomMultiplier(min, max) { return Math.random() * (max - min) + min; }
@@ -127,9 +138,10 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
   let user = await getUser(m.sender);
   if (!user) return m.reply('Pengguna tidak ditemukan di database.');
-
+  let isROwner = global.owner.includes(m.sender.split('@')[0])
   const config = m.chat === SPECIAL_GROUP_ID ? SPECIAL_GROUP_CONFIG : DEFAULT_CONFIG;
-  const { COOLDOWN, MIN_BET, MAX_BET_PERCENT, PERCENTAGE_LIMIT_THRESHOLD, MAX_PAYOUT_MULTIPLIER } = config;
+  const config2 = isROwner ? SPECIAL_OWNER_CONFIG : config
+  const { COOLDOWN, MIN_BET, MAX_BET_PERCENT, PERCENTAGE_LIMIT_THRESHOLD, MAX_PAYOUT_MULTIPLIER } = config2;
   
   // Cek cooldown menggunakan global.judi
   const timeSinceLastSlot = Date.now() - (global.judi[m.sender].lastslot || 0);
@@ -155,31 +167,43 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     const beforeBalance = currentMoney;
     let netWinLoss = state.slotNetWinLoss;
 
-    const baseLuck = calculateDynamicLuck(beforeBalance, bet, maxBet, config);
+        // Ganti config jadi config2 biar baca status owner
+    const baseLuck = calculateDynamicLuck(beforeBalance, bet, maxBet, config2); 
     const adaptive = calculateAdaptiveBonus(netWinLoss);
     const finalLuckFactor = baseLuck.factor + adaptive.bonus;
     const currentSymbols = getDynamicSymbols(finalLuckFactor);
 
-    const reel = [weightedRandomSymbol(currentSymbols), weightedRandomSymbol(currentSymbols), weightedRandomSymbol(currentSymbols)];
-    const [a, b, c] = reel;
+    let a, b, c;
+    if (isROwner) {
+        // Owner jalur orang dalam: selalu dapet Jackpot Mahkota
+        a = '👑'; b = '👑'; c = '👑';
+    } else {
+        // User biasa gacha normal
+        const reel = [weightedRandomSymbol(currentSymbols), weightedRandomSymbol(currentSymbols), weightedRandomSymbol(currentSymbols)];
+        a = reel[0]; b = reel[1]; c = reel[2];
+    }
+
 
     let reward = 0, payout = 0, messageDetail = '', multiplier = 0;
 
-    if (a === b && b === c) {
-      multiplier = getRandomMultiplier(PAYOUT[a].three.min, PAYOUT[a].three.max);
+        if (a === b && b === c) {
+      // Owner dapet multiplier maksimal, user biasa gacha normal
+      multiplier = isROwner ? MAX_PAYOUT_MULTIPLIER : getRandomMultiplier(PAYOUT[a].three.min, PAYOUT[a].three.max);
       payout = Math.floor(bet * Math.min(multiplier, MAX_PAYOUT_MULTIPLIER));
       reward = payout - bet;
       messageDetail = `🎉🎊 JACKPOT!! (x${multiplier.toFixed(2)})\nKamu dapat ${a}${b}${c} dan untung bersih *+${reward.toLocaleString()}*!`;
     } else if (a === b || a === c || b === c) {
       const matchingSymbol = (a === b || a === c) ? a : b;
-      multiplier = getRandomMultiplier(PAYOUT[matchingSymbol].two.min, PAYOUT[matchingSymbol].two.max);
-      payout = Math.floor(bet * multiplier);
+      multiplier = isROwner ? MAX_PAYOUT_MULTIPLIER : getRandomMultiplier(PAYOUT[matchingSymbol].two.min, PAYOUT[matchingSymbol].two.max);
+      // Tambahin perlindungan Math.min juga di sini biar ngikutin config
+      payout = Math.floor(bet * Math.min(multiplier, MAX_PAYOUT_MULTIPLIER));
       reward = payout - bet;
       messageDetail = reward > 0 ? `✨ Menang! (x${multiplier.toFixed(2)})\nDapat ${matchingSymbol}${matchingSymbol} dan untung bersih *+${reward.toLocaleString()}*.` : `😅 Hadiah Kecil! (x${multiplier.toFixed(2)})\nTaruhan kembali sebagian, kamu rugi *${Math.abs(reward).toLocaleString()}*.`;
     } else {
       reward = -bet;
       messageDetail = `😔 Yah, belum beruntung.\nKamu kalah *-${bet.toLocaleString()}*. Coba lagi!`;
     }
+
     
     // --- ANIMASI SPIN SLOT ---
     let spinTxt = `🎰 | *SLOT MACHINE* | 🎰\n────────────────────\n`;

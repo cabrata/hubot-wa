@@ -1,0 +1,301 @@
+const { db, getTool, setTool } = require('./database');
+
+// ─── TINGKAT KESULITAN (ANIME STYLE) ───
+const DIFFICULTY = {
+    'F':  { mult: 0.5, name: 'F-Rank (Trainee)', minLevel: 1 },
+    'E':  { mult: 0.8, name: 'E-Rank (Beginner)', minLevel: 5 },
+    'D':  { mult: 1.0, name: 'D-Rank (Normal)', minLevel: 10 },
+    'C':  { mult: 1.5, name: 'C-Rank (Hard)', minLevel: 25 },
+    'B':  { mult: 2.5, name: 'B-Rank (Veteran)', minLevel: 50 },
+    'A':  { mult: 5.0, name: 'A-Rank (Nightmare)', minLevel: 80 },
+    'A+': { mult: 10.0, name: 'A+ Rank (Hell)', minLevel: 100 },
+    'S':  { mult: 25.0, name: 'S-Rank (Abyssal)', minLevel: 150 },
+    'SS': { mult: 100.0, name: 'SS-Rank (God Slayer)', minLevel: 250 }
+};
+
+// ─── SKILL & MANA SYSTEM ───
+const SKILLS = {
+    1: { name: 'Dual Slash',  type: 'balance', mana: 5,  atkMod: 1.2, defMod: 1.0 },
+    2: { name: 'Cross Parry', type: 'defense', mana: 10, atkMod: 0.5, defMod: 2.5 },
+    3: { name: 'Frenzy Strike',type: 'attack', mana: 15, atkMod: 2.5, defMod: 0.5 },
+    4: { name: 'Blade Dance', type: 'speed',   mana: 20, atkMod: 1.8, defMod: 1.5 },
+    5: { name: 'Lethal Combo',type: 'crit',    mana: 25, atkMod: 3.5, defMod: 0.2 }
+};
+
+// ─── DAFTAR NAMA MONSTER & BOSS ───
+const MONSTER_LIST = [
+    'Slime Mutan', 'Goblin Petarung', 'Hobgoblin', 'Dire Wolf', 'Troll Hutan',
+    'Skeleton Warrior', 'Poisonous Snake', 'Giant Spider', 'Shadow Assassin', 
+    'Gargoyle', 'Orc Berserker', 'Vampire Bat', 'Cursed Armor', 'Lizardman'
+];
+
+const BOSS_LIST = [
+    'Cerberus', 'Minotaur', 'Dullahan', 'Lich King', 'Abyssal Dragon', 
+    'Behemoth', 'Chimera', 'Ifrit', 'Leviathan', 'Colossal Titan', 
+    'Demon Lord', 'Fallen Angel', 'Death Knight'
+];
+
+// Fungsi untuk ambil item random dari array
+const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+class DungeonEngine {
+    constructor() {
+        // Nyimpen sesi pertempuran aktif di RAM biar responsif
+        if (!global.dungeonSessions) global.dungeonSessions = {};
+        this.sessions = global.dungeonSessions;
+    }
+
+    // ─── 1. MEMBUAT / MEMULAI SESI ───
+    async startSession(leaderJid, mode, diffCode) {
+        let diff = DIFFICULTY[diffCode.toUpperCase()] || DIFFICULTY['D'];
+        let sessionId = 'DG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+        
+        // Cek data dungeon player
+        let pDungeon = await db.userDungeon.upsert({
+            where: { jid: leaderJid },
+            update: { inSession: true },
+            create: { jid: leaderJid, inSession: true }
+        });
+
+        this.sessions[sessionId] = {
+            id: sessionId,
+            mode: mode, // 'SOLO', 'PARTY', 'GLOBAL'
+            difficulty: diff,
+            floor: pDungeon.currentFloor || 1, // Lanjut dari lantai terakhir atau 1
+            players: [leaderJid],
+            maxPlayers: mode === 'SOLO' ? 1 : (mode === 'PARTY' ? 5 : 100),
+            status: 'EXPLORING', // EXPLORING, COMBAT, BOSS_GATE
+            monster: null,
+            turnQueue: [], // Buat nahan spam attack pas party/raid
+            loot: { money: 0n, exp: 0n, itemDrops: {} }
+        };
+
+        return this.sessions[sessionId];
+    }
+
+    // ─── 2. GENERATE MONSTER & BOSS GATE ───
+    async generateEncounter(sessionId) {
+        let session = this.sessions[sessionId];
+        let isBoss = session.floor % 10 === 0; // Tiap kelipatan 10 adalah Boss
+        
+        let baseHp = isBoss ? 10000 : 800;
+        let baseAtk = isBoss ? 1500 : 150;
+        let scale = session.difficulty.mult * (1 + (session.floor * 0.15));
+
+        // HP Boss di mode Party/Global dikali jumlah player biar imbang
+        let pCount = session.players.length;
+        let hpMod = baseHp * scale * (isBoss ? pCount : 1);
+        let atkMod = baseAtk * scale;
+
+        // Bikin Nama Random
+        let randomMonster = getRandom(MONSTER_LIST);
+        let randomBoss = getRandom(BOSS_LIST);
+
+        session.monster = {
+            name: isBoss ? `👑 ${randomBoss} (Floor ${session.floor})` : `👿 ${randomMonster}`,
+            isBoss: isBoss,
+            hp: Math.floor(hpMod),
+            maxHp: Math.floor(hpMod),
+            atk: Math.floor(atkMod)
+        };
+
+        // Kalo ini lantai Boss, ubah status ke BOSS_GATE buat Power Check
+        if (isBoss) {
+            session.status = 'BOSS_GATE';
+            session.gateReq = Math.floor(hpMod * 0.3); // Syarat power minimal
+        } else {
+            session.status = 'COMBAT';
+        }
+
+        return session.monster;
+    }
+
+    // ─── 3. BOSS GATE POWER CHECK ───
+    async checkBossGate(sessionId) {
+        let session = this.sessions[sessionId];
+        let totalPower = 0;
+
+        // Hitung total kekuatan semua player di party
+        for (let jid of session.players) {
+            let uRpg = await db.userRpg.findUnique({ where: { jid } });
+            let sword = await getTool(jid, 'sword');
+            let armor = await getTool(jid, 'armor');
+            
+            // Power = (Atk + Def) + (Sword * 150) + (Armor * 200)
+            let pPower = (Number(uRpg.attack) + Number(uRpg.defense)) + (sword.owned * 150) + (armor.owned * 200);
+            totalPower += pPower;
+        }
+
+        if (totalPower >= session.gateReq) {
+            session.status = 'COMBAT'; // Lolos, gerbang kebuka
+            return { passed: true, totalPower, req: session.gateReq };
+        } else {
+            // Gagal Power Check = Instant Wipeout (Mati)
+            await this.wipeoutParty(sessionId);
+            return { passed: false, totalPower, req: session.gateReq };
+        }
+    }
+
+    // ─── 4. COMBAT MECHANIC (TURN BASED) ───
+    async processAttack(sessionId, playerJid, skillId) {
+        let session = this.sessions[sessionId];
+        if (session.status !== 'COMBAT') return { error: 'Sedang tidak dalam pertarungan!' };
+
+        let skill = SKILLS[skillId] || SKILLS[1];
+        let pDungeon = await db.userDungeon.findUnique({ where: { jid: playerJid } });
+        
+        // Cek Mana
+        if (pDungeon.mana < skill.mana) return { error: `Mana tidak cukup untuk ${skill.name}! Sisa Mana: ${pDungeon.mana}` };
+
+        let uRpg = await db.userRpg.findUnique({ where: { jid: playerJid } });
+        let sword = await getTool(playerJid, 'sword');
+        let armor = await getTool(playerJid, 'armor');
+
+        // Kalkulasi Damage Player
+        let pAtk = (Number(uRpg.attack) + (sword.owned * 150)) * skill.atkMod;
+        let pDef = (Number(uRpg.defense) + (armor.owned * 200)) * skill.defMod;
+        
+        // Armor & Senjata ngurangin tingkat kesulitan (ngurangin damage monster)
+        let dmgToMonster = Math.floor(Math.max(1, pAtk - (session.monster.hp * 0.05)));
+        session.monster.hp -= dmgToMonster;
+
+        // Potong Mana Player
+        await db.userDungeon.update({
+            where: { jid: playerJid },
+            data: { mana: Math.max(0, pDungeon.mana - skill.mana) }
+        });
+
+        // Kalo Monster Mati
+        if (session.monster.hp <= 0) {
+            return await this.floorCleared(sessionId);
+        }
+
+        // Monster Serang Balik
+        let dmgToPlayer = Math.floor(Math.max(1, session.monster.atk - pDef));
+        let newHealth = Math.max(0, Number(uRpg.health) - dmgToPlayer);
+        
+        await db.userRpg.update({
+            where: { jid: playerJid },
+            data: { health: newHealth }
+        });
+
+        // Kalo Player Mati
+        if (newHealth <= 0) {
+            if (session.players.length === 1) {
+                await this.wipeoutParty(sessionId);
+                return { status: 'WIPEOUT', dmgGiven: dmgToMonster, dmgTaken: dmgToPlayer };
+            } else {
+                return { status: 'PLAYER_DEAD', dmgGiven: dmgToMonster, dmgTaken: dmgToPlayer };
+            }
+        }
+
+        return { 
+            status: 'NEXT_TURN', 
+            skillUsed: skill.name,
+            dmgGiven: dmgToMonster, 
+            dmgTaken: dmgToPlayer, 
+            mHp: session.monster.hp,
+            pMana: pDungeon.mana - skill.mana
+        };
+    }
+
+    // ─── 5. FLOOR CLEARED (REGEN & LOOT) ───
+    async floorCleared(sessionId) {
+        let session = this.sessions[sessionId];
+        
+        // Hitung Loot
+        let bExp = session.monster.isBoss ? 5000 : 500;
+        let bMoney = session.monster.isBoss ? 25000 : 1000;
+        
+        session.loot.exp += BigInt(Math.floor(bExp * session.difficulty.mult));
+        session.loot.money += BigInt(Math.floor(bMoney * session.difficulty.mult));
+        session.floor += 1;
+        session.status = 'EXPLORING';
+
+        // Regen System (Anime Style: Nafas dikit setelah clear lantai)
+        for (let jid of session.players) {
+            let uRpg = await db.userRpg.findUnique({ where: { jid } });
+            let uDungeon = await db.userDungeon.findUnique({ where: { jid } });
+            
+            // Heal 20% HP, Regen 30% Mana
+            let heal = Math.floor(Number(uRpg.health) * 0.20);
+            let manaRegen = Math.floor(uDungeon.maxMana * 0.30);
+
+            await db.userRpg.update({ where: { jid }, data: { health: Math.min(100, Number(uRpg.health) + heal) } });
+            await db.userDungeon.update({ where: { jid }, data: { mana: Math.min(uDungeon.maxMana, uDungeon.mana + manaRegen) } });
+        }
+
+        let clearedData = { ...session.monster };
+        session.monster = null;
+
+        return { status: 'CLEARED', boss: clearedData.isBoss, newFloor: session.floor };
+    }
+
+    // ─── 6. DEATH PENALTY (WIPEOUT) ───
+    async wipeoutParty(sessionId) {
+        let session = this.sessions[sessionId];
+        
+        for (let jid of session.players) {
+            let sword = await getTool(jid, 'sword');
+            let armor = await getTool(jid, 'armor');
+
+            // Hukuman Keras: Lantai reset ke 1, Armor & Pedang rusak parah (minus 25 durability)
+            await db.userDungeon.update({
+                where: { jid },
+                data: { 
+                    inSession: false, 
+                    currentFloor: 1, // KICK KE LANTAI 1
+                    sessionMoney: 0n,
+                    sessionExp: 0n
+                }
+            });
+
+            if (sword.owned > 0) await setTool(jid, 'sword', sword.owned, Math.max(0, sword.durability - 25));
+            if (armor.owned > 0) await setTool(jid, 'armor', armor.owned, Math.max(0, armor.durability - 25));
+            
+            // HP dibikin sekarat
+            await db.userRpg.update({ where: { jid }, data: { health: 5 } });
+        }
+
+        delete this.sessions[sessionId];
+    }
+
+    // ─── 7. LEAVE AMAN (SAVE PROGRESS) ───
+    async leaveSession(sessionId) {
+        let session = this.sessions[sessionId];
+        if (!session) return;
+
+        for (let jid of session.players) {
+            let uDungeon = await db.userDungeon.findUnique({ where: { jid } });
+            
+            // Simpan posisi lantai & pindahin loot ke kantong utama
+            await db.userDungeon.update({
+                where: { jid },
+                data: { 
+                    inSession: false,
+                    currentFloor: session.floor,
+                    maxFloor: Math.max(uDungeon.maxFloor, session.floor)
+                }
+            });
+
+            let uEco = await db.userEconomy.findUnique({ where: { jid } });
+            let uCore = await db.user.findUnique({ where: { jid } });
+
+            await db.userEconomy.update({ where: { jid }, data: { money: Number(uEco.money) + Number(session.loot.money) } });
+            await db.user.update({ where: { jid }, data: { exp: BigInt(uCore.exp) + session.loot.exp } });
+        }
+
+        delete this.sessions[sessionId];
+    }
+    
+    // ─── 8. PREVENT SOFTLOCK (Jalanin pas bot restart) ───
+    async forceClearAllLocks() {
+        await db.userDungeon.updateMany({
+            where: { inSession: true },
+            data: { inSession: false }
+        });
+        this.sessions = {};
+    }
+}
+
+module.exports = new DungeonEngine();

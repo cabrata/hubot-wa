@@ -1,50 +1,29 @@
-const { db } = require('../../lib/database.js') 
-
 let handler = async (m, { conn, usedPrefix }) => {
-    try {
-        // Ambil user yang dibanned dari SQL
-        let bannedUsers = await db.user.findMany({ where: { banned: true } });
-
-        if (bannedUsers.length === 0) {
-            return conn.sendMessage(m.chat, { text: '✨ Wah, database bersih! Nggak ada user yang lagi kena banned.' }, { quoted: m });
-        }
-
-        let txt = `📋 *DAFTAR USER BANNED*\nTotal: *${bannedUsers.length} User*\n\n`;
-
-        bannedUsers.forEach((u, i) => {
-            let reason = u.BannedReason || 'Tidak ada alasan';
-            let level = u.banLevel || 0;
-            
-            // Konversi BigInt waktu ke format yang bisa dibaca
-            let until = Number(u.bannedUntil || 0n);
-            let timeLimit = until > 0 ? `Sampai: ${new Date(until).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB` : 'PERMANEN ⛔';
-            
-            // Format ID, jaga-jaga kalau key jid-nya beda di DB lu (misal u.id atau u.jid)
-            let jid = u.jid || u.id; 
-            
-            txt += `${i + 1}. @${jid.split('@')[0]}\n`;
-            txt += `   ├ Lvl Ban: ${level}\n`;
-            txt += `   ├ Alasan: ${reason}\n`;
-            txt += `   └ Status: ${timeLimit}\n\n`;
-        });
-
-        // Mentions array biar tag-nya warna biru
-        let mentionList = bannedUsers.map(u => u.jid || u.id);
-
-        await conn.sendMessage(m.chat, { 
-            text: txt.trim(), 
-            mentions: mentionList 
-        }, { quoted: m });
-
-    } catch (e) {
-        console.error(e);
-        m.reply('❌ Terjadi kesalahan saat membaca database. Pastikan fungsi getAllUsers tersedia di lib/database.js');
+    // Pastikan array-nya ada
+    global.banRequests = global.banRequests || []
+    if (!m.chat === '120363368633822650@g.us') return m.reply('Fitur ini hanya dapat digunakan di grup staff')
+    if (global.banRequests.length === 0) {
+        return m.reply('🎉 Saat ini tidak ada antrean request ban dari Tim Support.')
     }
+
+    let teks = `📋 *DAFTAR REQUEST BANNED*\n\n`
+    for (let i = 0; i < global.banRequests.length; i++) {
+        let req = global.banRequests[i]
+        teks += `*${i + 1}.* Target: @${req.who.split('@')[0]}\n`
+        teks += `   ├ 🧑‍💻 Req By: @${req.requestedBy}\n`
+        teks += `   └ 💬 Alasan: ${req.reason}\n\n`
+    }
+    
+    teks += `Ketik *${usedPrefix}ban [nomor]* untuk menyetujui.\nContoh: *${usedPrefix}ban 1*`
+
+    // Extract jid buat mentions
+    let mentionsJid = global.banRequests.map(r => r.who).concat(global.banRequests.map(r => r.requestedBy + '@s.whatsapp.net'))
+
+    conn.sendMessage(m.chat, { text: teks, mentions: [...new Set(mentionsJid)] }, { quoted: m })
 }
 
 handler.help = ['listban']
-handler.tags = ['owner']
-handler.command = /^(listban|bannedlist)$/i
-handler.owner = true // Khusus Owner
+handler.tags = ['staff']
+handler.command = /^(listban|antreanban)$/i
 
 module.exports = handler
