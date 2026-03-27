@@ -196,6 +196,20 @@ module.exports = {
                     m.usedPrefix = usedPrefix
                     m.command = command
 
+                    // --- SESSION LOCK MECHANIC (DIBACA SEMUA COMMAND) ---
+                    if (!['dungeon', 'dg'].includes(command)) {
+                        try {
+                            const { db } = require('./lib/database');
+                            let uDungeon = await db.userDungeon.findUnique({ where: { jid: m.sender } });
+                            if (uDungeon && uDungeon.inSession) {
+                                m.reply(`⚠️ *[ FOCUS MODE ]*\nKamu masih terjebak di dalam Dungeon.\nSemua command dari luar diblokir sementara.\n\nKetik *.dungeon leave* jika ingin menyerah dan keluar.`);
+                                break; // BLOCK eksekusi plugin lain
+                            }
+                        } catch (e) {
+                            // Abaikan kalau error db
+                        }
+                    }
+
                     // ========== PERMISSION & BAN CHECKS ==========
                     const chatData = m.chatData || {}
                     const userData = m.user || {}

@@ -418,6 +418,14 @@
             global.lastQR = null
             console.log(chalk.green(`[WA] ✅ Connected as ${global.conn.user?.name || 'Unknown'}`))
             global.timestamp.connect = new Date()
+            
+            // Quest system auto spawn
+            try {
+                require('./lib/quest').startAutoSpawn();
+            } catch (e) {
+                console.error('[QUEST] Error starting auto spawn:', e.message);
+            }
+
             if (global.broadcastWS) global.broadcastWS({
                 type: 'connected',
                 user: { name: global.conn.user?.name, jid: global.conn.user?.id },
