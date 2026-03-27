@@ -58,3 +58,5 @@ yt-dlp
 .cache/
 pasangan/
 .config/database/
+.config/ git add .gitignore git commit -m chore: add .config to gitignore
+.config/
